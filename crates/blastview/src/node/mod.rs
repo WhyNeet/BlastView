@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 
+use crate::view::registry::ViewRef;
+
 pub enum Node {
     Text(Box<TextNode>),
     Element(Box<ElementNode>),
+    ViewRef(Box<ViewRef>),
 }
 
 impl Node {
@@ -11,13 +14,11 @@ impl Node {
     }
 
     pub fn text(text: &str) -> TextNode {
-        TextNode::new(text)
+        text.into()
     }
 }
 
-pub struct TextNode {
-    pub(crate) text: String,
-}
+pub struct TextNode(pub(crate) String);
 
 pub struct ElementNode {
     pub(crate) tag: String,
@@ -55,17 +56,27 @@ impl ElementNode {
     }
 }
 
-impl TextNode {
-    pub fn new(text: &str) -> Self {
-        Self {
-            text: text.to_string(),
-        }
+impl Into<TextNode> for &str {
+    fn into(self) -> TextNode {
+        TextNode(self.to_string())
+    }
+}
+
+impl Into<TextNode> for String {
+    fn into(self) -> TextNode {
+        TextNode(self)
     }
 }
 
 impl Into<Node> for &str {
     fn into(self) -> Node {
-        Node::Text(Box::new(TextNode::new(self)))
+        TextNode(self.to_string()).into()
+    }
+}
+
+impl Into<Node> for String {
+    fn into(self) -> Node {
+        TextNode(self).into()
     }
 }
 
@@ -78,5 +89,11 @@ impl Into<Node> for TextNode {
 impl Into<Node> for ElementNode {
     fn into(self) -> Node {
         Node::Element(Box::new(self))
+    }
+}
+
+impl Into<Node> for ViewRef {
+    fn into(self) -> Node {
+        Node::ViewRef(Box::new(self))
     }
 }

@@ -1,16 +1,20 @@
-use blastview::{component::Component, node::Node, renderer};
+use blastview::{
+    node::Node,
+    renderer::Renderer,
+    view::{View, context::ViewContext},
+};
 
 #[test]
-fn component_rendering_works() {
-    struct MyComponent;
-    impl Component for MyComponent {
-        fn render(&self) -> impl Into<blastview::node::Node> {
+fn view_rendering_works() {
+    struct MyView;
+    impl View for MyView {
+        fn render(&self, _: &ViewContext) -> impl Into<blastview::node::Node> {
             Node::new("div")
                 .attr("class", "container")
                 .child("Hello world!")
         }
     }
 
-    let output = renderer::render_component_to_string(&MyComponent);
+    let output = Renderer::render_to_string(|| MyView);
     assert_eq!(output, r#"<div class="container">Hello world!</div>"#);
 }
