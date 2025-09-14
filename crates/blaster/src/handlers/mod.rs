@@ -4,11 +4,12 @@ use axum::{
     extract::State,
     response::{Html, IntoResponse},
 };
-use blastview::{component::Component, renderer};
+use blastview::{renderer::Renderer, view::View};
 
-pub async fn catch_all<C>(State(component): State<Arc<C>>) -> impl IntoResponse
+pub async fn catch_all<V, F>(State(factory): State<Arc<F>>) -> impl IntoResponse
 where
-    C: Component + Send + Sync + 'static,
+    V: View + Send + Sync + 'static,
+    F: Fn() -> V + Send + Sync,
 {
     let html = format!(
         r#"
@@ -22,7 +23,7 @@ where
           </body>
           </html>
       "#,
-        renderer::render_component_to_string(component.as_ref())
+        Renderer::render_to_string(|| factory())
     );
 
     Html(html)
