@@ -108,7 +108,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2261d10cca569e4643e526d8dc2e62e433cc8aba21ab764233731f8d369bf394"
 
 [[package]]
-name = "blastserver"
+name = "blaster"
 version = "0.1.0"
 dependencies = [
  "axum",
@@ -264,7 +264,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 name = "hello_world"
 version = "0.1.0"
 dependencies = [
- "blastserver",
+ "blaster",
  "blastview",
  "tokio",
 ]

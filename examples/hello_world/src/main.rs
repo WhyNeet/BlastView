@@ -2,7 +2,7 @@ use blastview::{component::Component, node::Node};
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    blastserver::serve(MyComponent).await
+    blaster::serve(MyComponent).await
 }
 
 struct MyComponent;

@@ -5,5 +5,5 @@ edition = "2024"
 
 [dependencies]
 blastview = { path = "../../crates/blastview" }
-blastserver = { path = "../../crates/blastserver" }
+blaster = { path = "../../crates/blaster" }
 tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread"] }
