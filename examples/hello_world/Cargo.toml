@@ -1,0 +1,9 @@
+[package]
+name = "hello_world"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+blastview = { path = "../../crates/blastview" }
+blastserver = { path = "../../crates/blastserver" }
+tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread"] }
