@@ -3,11 +3,11 @@ use crate::{
     node::{ElementNode, Node},
 };
 
-pub fn render_component_to_string<C>() -> String
+pub fn render_component_to_string<C>(component: &C) -> String
 where
     C: Component,
 {
-    render_node_to_string(C::render().into())
+    render_node_to_string(component.render().into())
 }
 
 fn render_node_to_string(node: Node) -> String {

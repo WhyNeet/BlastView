@@ -1,5 +1,5 @@
 use crate::node::Node;
 
 pub trait Component {
-    fn render() -> impl Into<Node>;
+    fn render(&self) -> impl Into<Node>;
 }
