@@ -24,28 +24,10 @@ async fn main() -> std::io::Result<()> {
 struct MyView;
 
 impl View for MyView {
-    fn render(&self, cx: &blastview::view::context::ViewContext) -> impl Into<Node> {
-        let counter = cx.create(|| CounterView);
-
+    fn render(&self, _: &blastview::view::context::ViewContext) -> impl Into<Node> {
         Node::new("div")
             .attr("class", "container")
             .child(my_component())
-            .child(counter)
-    }
-}
-
-struct CounterView;
-
-impl View for CounterView {
-    fn render(&self, _: &blastview::view::context::ViewContext) -> impl Into<Node> {
-        Node::new("button")
-            .on("click", || {
-                println!("increment");
-            })
-            .on("hover", || {
-                println!("hover!");
-            })
-            .child(format!("Count: 0"))
     }
 }
 
