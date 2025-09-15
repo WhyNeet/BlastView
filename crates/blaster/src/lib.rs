@@ -2,7 +2,7 @@ mod handlers;
 
 use std::{io, sync::Arc};
 
-use axum::{Router, routing::get};
+use axum::Router;
 use blastview::view::View;
 use tokio::net::TcpListener;
 
@@ -14,10 +14,10 @@ where
     let factory = Arc::new(factory);
 
     let app = Router::new()
-        .route("/", get(handlers::catch_all::<V, F>))
-        .route("/{*path}", get(handlers::catch_all::<V, F>))
+        .merge(handlers::router::<V, F>())
         .with_state(factory);
 
     let listener = TcpListener::bind(("0.0.0.0", 8080)).await?;
+    tracing::info!("Listening on 0.0.0.0:8080");
     axum::serve(listener, app).await
 }

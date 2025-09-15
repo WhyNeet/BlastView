@@ -1,30 +1,18 @@
 use std::sync::Arc;
 
-use axum::{
-    extract::State,
-    response::{Html, IntoResponse},
-};
-use blastview::{renderer::Renderer, view::View};
+use axum::{Router, routing::get};
+use blastview::view::View;
 
-pub async fn catch_all<V, F>(State(factory): State<Arc<F>>) -> impl IntoResponse
+pub mod live;
+pub mod ssr;
+
+pub fn router<V, F>() -> Router<Arc<F>>
 where
     V: View + Send + Sync + 'static,
-    F: Fn() -> V + Send + Sync,
+    F: Fn() -> V + Send + Sync + 'static,
 {
-    let html = format!(
-        r#"
-          <!DOCTYPE html>
-          <html>
-          <head>
-              <title>BlastView App</title>
-          </head>
-          <body>
-              <div id="app">{}</div>
-          </body>
-          </html>
-      "#,
-        Renderer::render_to_string(|| factory())
-    );
-
-    Html(html)
+    Router::new()
+        .route("/__ws", get(live::live_handler))
+        .route("/", get(ssr::ssr_handler))
+        .route("/{*path}", get(ssr::ssr_handler))
 }
