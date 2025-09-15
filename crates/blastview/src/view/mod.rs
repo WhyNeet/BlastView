@@ -1,6 +1,7 @@
 use crate::{node::Node, view::context::ViewContext};
 
 pub mod context;
+pub(crate) mod events;
 pub(crate) mod registry;
 
 pub trait RenderableView {

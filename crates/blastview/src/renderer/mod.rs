@@ -8,10 +8,10 @@ pub struct Renderer {}
 impl Renderer {
     pub fn render_to_string<V, F>(factory: F) -> String
     where
-        V: View + 'static,
+        V: View + Send + Sync + 'static,
         F: Fn() -> V,
     {
-        let root_cx = ViewContext::new(0);
+        let root_cx = ViewContext::new(0, Default::default());
         let view_ref = root_cx.create(factory);
 
         Self::render_view_to_string(view_ref, &root_cx)

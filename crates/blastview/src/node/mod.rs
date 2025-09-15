@@ -23,7 +23,7 @@ pub struct TextNode(pub(crate) String);
 pub struct ElementNode {
     pub(crate) tag: String,
     pub(crate) attrs: HashMap<String, String>,
-    pub(crate) events: HashMap<String, Box<dyn Fn()>>,
+    pub(crate) events: HashMap<String, Box<dyn Fn() + Send + Sync>>,
     pub(crate) children: Vec<Node>,
 }
 
@@ -44,7 +44,7 @@ impl ElementNode {
 
     pub fn on<F>(mut self, event: &str, handler: F) -> Self
     where
-        F: Fn() + 'static,
+        F: Fn() + Send + Sync + 'static,
     {
         self.events.insert(event.to_string(), Box::new(handler));
         self
