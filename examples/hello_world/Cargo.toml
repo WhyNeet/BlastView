@@ -7,3 +7,4 @@ edition = "2024"
 blastview = { path = "../../crates/blastview" }
 blaster = { path = "../../crates/blaster" }
 tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread"] }
+tracing-subscriber = "0.3.20"

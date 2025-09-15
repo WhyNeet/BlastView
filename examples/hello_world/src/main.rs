@@ -1,7 +1,23 @@
 use blastview::{node::Node, view::View};
+use tracing_subscriber::{
+    filter::{EnvFilter, LevelFilter},
+    fmt,
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+};
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env()
+                .unwrap(),
+        )
+        .init();
+
     blaster::serve(|| MyView).await
 }
 
@@ -21,10 +37,13 @@ impl View for MyView {
 struct CounterView;
 
 impl View for CounterView {
-    fn render(&self, cx: &blastview::view::context::ViewContext) -> impl Into<Node> {
+    fn render(&self, _: &blastview::view::context::ViewContext) -> impl Into<Node> {
         Node::new("button")
             .on("click", || {
                 println!("increment");
+            })
+            .on("hover", || {
+                println!("hover!");
             })
             .child(format!("Count: 0"))
     }
