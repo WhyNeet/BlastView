@@ -22,4 +22,13 @@ impl GlobalEventsRegistry {
     pub fn remove(&self, id: &str) {
         self.mapping.lock().unwrap().remove(id);
     }
+
+    pub fn all_events<F>(&self, mut f: F)
+    where
+        F: FnMut(&str),
+    {
+        for (event, _) in self.mapping.lock().unwrap().iter() {
+            f(event);
+        }
+    }
 }

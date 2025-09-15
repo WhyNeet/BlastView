@@ -6,8 +6,6 @@ use std::{
     },
 };
 
-use uuid::Uuid;
-
 use crate::{
     node::Node,
     view::{
@@ -18,28 +16,34 @@ use crate::{
 };
 
 pub struct ViewContext {
-    id: usize,
+    order: usize,
     registry: Arc<Mutex<OrderedViewRegistry>>,
     current_order: AtomicUsize,
     event_registry: Arc<GlobalEventsRegistry>,
     handlers: Arc<Mutex<HashMap<String, Arc<dyn Fn() + Send + Sync>>>>,
+    last_render: Arc<Mutex<Option<Node>>>,
 }
 
 impl ViewContext {
-    pub fn new(id: usize, event_registry: Arc<GlobalEventsRegistry>) -> Self {
+    pub fn new(order: usize, event_registry: Arc<GlobalEventsRegistry>) -> Self {
         Self {
-            id,
+            order,
             registry: Default::default(),
             current_order: Default::default(),
             event_registry,
             handlers: Default::default(),
+            last_render: Default::default(),
         }
     }
 
     pub(crate) fn prepare(&self) {
         self.current_order.store(0, Ordering::Relaxed);
+    }
+
+    fn unregister_handlers(&self) {
         let mut handlers = self.handlers.lock().unwrap();
         for (event, _) in handlers.iter() {
+            tracing::debug!("unregister event: {event}");
             self.event_registry.remove(event);
         }
         *handlers = Default::default();
@@ -50,57 +54,65 @@ impl ViewContext {
         F: Fn() -> V,
         V: View + Send + Sync + 'static,
     {
-        let id = self.get_order();
+        let order = self.get_order();
 
-        if let Some((cx, _)) = self.registry.lock().unwrap().retrieve(id) {
+        if let Some((cx, view)) = self.registry.lock().unwrap().retrieve(order) {
             cx.prepare();
-            let view_ref = ViewRef { id: cx.id };
-            self.register_view_events(view_ref, cx);
+            cx.unregister_handlers();
+            let view_ref = ViewRef { order: cx.order };
+            let tree = RenderableView::render(view.as_ref(), &cx);
+            self.register_node_events(&tree, Arc::clone(&cx));
+            *cx.last_render.lock().unwrap() = Some(tree);
             return view_ref;
         }
-        let context = ViewContext::new(id, Arc::clone(&self.event_registry));
+        let context = ViewContext::new(order, Arc::clone(&self.event_registry));
         let context = Arc::new(context);
         let view = factory();
 
-        let view_ref = ViewRef { id };
+        let view_ref = ViewRef { order };
 
         self.registry
             .lock()
             .unwrap()
             .insert(Arc::clone(&context), view);
 
-        let (cx, view) = self.get_ordered(view_ref.id);
-        let tree = RenderableView::render(view.as_ref(), &self);
-        self.register_node_events(tree, cx);
+        let (cx, view) = self.get_ordered(view_ref.order);
+        *cx.last_render.lock().unwrap() = Some(RenderableView::render(view.as_ref(), &cx));
 
         view_ref
     }
 
-    fn register_view_events(&self, view: ViewRef, context: Arc<ViewContext>) {
-        let (cx, view) = context.get_ordered(view.id);
-        let tree = RenderableView::render(view.as_ref(), &cx);
-
-        self.register_node_events(tree, cx);
+    pub(crate) fn retrieve_last_render(self: Arc<Self>) -> Node {
+        let node = self.last_render.lock().unwrap().take().unwrap();
+        Arc::clone(&self).register_node_events(&node, self);
+        node
     }
 
-    fn register_node_events(&self, node: Node, context: Arc<ViewContext>) {
+    fn register_node_events(&self, node: &Node, context: Arc<ViewContext>) {
         match node {
             Node::Element(node) => {
                 let cx = context.clone();
-                for (event, handler) in node.events.into_iter() {
+                for (event, handler) in node.events.iter() {
                     let cx = Arc::clone(&cx);
-                    let event_name = format!("{event}_{}", Uuid::new_v4());
-                    tracing::debug!("event registered: {event_name}");
-                    let cx_handlers = cx.clone();
-                    let mut cx_handlers = cx_handlers.handlers.lock().unwrap();
-                    cx_handlers.insert(event_name.clone(), Arc::new(handler));
+                    let event_name = format!("{}_{event}", node.id);
+                    tracing::debug!("[{}] event registered: {event_name}", node.tag);
+                    {
+                        let cx = cx.clone();
+                        let mut cx_handlers = cx.handlers.lock().unwrap();
+                        cx_handlers.insert(event_name.clone(), Arc::clone(handler));
+                    }
 
-                    let cx_for_event_reg = cx.clone();
-                    cx.event_registry.insert(event_name, cx_for_event_reg);
+                    {
+                        let cx_for_event_reg = cx.clone();
+                        cx.event_registry.insert(event_name, cx_for_event_reg);
+                    }
+                }
+
+                for child in node.children.iter() {
+                    self.register_node_events(child, Arc::clone(&context));
                 }
             }
-            Node::Text(_) => {}
-            Node::ViewRef(view) => self.register_view_events(*view, context),
+            _ => {}
         }
     }
 

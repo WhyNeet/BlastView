@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use uuid::Uuid;
 
 use crate::view::registry::ViewRef;
+use std::{collections::HashMap, sync::Arc};
 
 pub enum Node {
     Text(Box<TextNode>),
@@ -21,15 +22,17 @@ impl Node {
 pub struct TextNode(pub(crate) String);
 
 pub struct ElementNode {
+    pub(crate) id: Uuid,
     pub(crate) tag: String,
     pub(crate) attrs: HashMap<String, String>,
-    pub(crate) events: HashMap<String, Box<dyn Fn() + Send + Sync>>,
+    pub(crate) events: HashMap<String, Arc<dyn Fn() + Send + Sync>>,
     pub(crate) children: Vec<Node>,
 }
 
 impl ElementNode {
     pub fn new(tag: &str) -> Self {
         Self {
+            id: Uuid::new_v4(),
             tag: tag.to_string(),
             attrs: Default::default(),
             events: Default::default(),
@@ -46,7 +49,7 @@ impl ElementNode {
     where
         F: Fn() + Send + Sync + 'static,
     {
-        self.events.insert(event.to_string(), Box::new(handler));
+        self.events.insert(event.to_string(), Arc::new(handler));
         self
     }
 

@@ -1,6 +1,6 @@
 use blastview::{
     node::Node,
-    renderer::Renderer,
+    renderer::StaticRenderer,
     view::{View, context::ViewContext},
 };
 
@@ -15,6 +15,6 @@ fn view_rendering_works() {
         }
     }
 
-    let output = Renderer::render_to_string(|| MyView);
+    let output = StaticRenderer::render_to_string(|| MyView);
     assert_eq!(output, r#"<div class="container">Hello world!</div>"#);
 }

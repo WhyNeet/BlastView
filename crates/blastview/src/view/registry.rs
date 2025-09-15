@@ -25,5 +25,5 @@ impl OrderedViewRegistry {
 
 #[derive(Debug, Clone, Copy)]
 pub struct ViewRef {
-    pub(crate) id: usize,
+    pub(crate) order: usize,
 }

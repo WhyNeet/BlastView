@@ -1,39 +1,49 @@
+mod static_rendering;
+pub use static_rendering::*;
+
+use std::sync::Arc;
+
 use crate::{
     node::{ElementNode, Node},
-    view::{View, context::ViewContext, registry::ViewRef},
+    view::{context::ViewContext, registry::ViewRef},
 };
 
-pub struct Renderer {}
+pub struct Renderer {
+    root_context: Arc<ViewContext>,
+    root_view: ViewRef,
+}
 
 impl Renderer {
-    pub fn render_to_string<V, F>(factory: F) -> String
-    where
-        V: View + Send + Sync + 'static,
-        F: Fn() -> V,
-    {
-        let root_cx = ViewContext::new(0, Default::default());
-        let view_ref = root_cx.create(factory);
+    pub fn new(root_context: Arc<ViewContext>, root_view: ViewRef) -> Self {
+        Self {
+            root_context,
+            root_view,
+        }
+    }
+}
 
-        Self::render_view_to_string(view_ref, &root_cx)
+impl Renderer {
+    pub fn render_to_string(&self) -> String {
+        self.render_view_to_string(self.root_view, &self.root_context)
     }
 
-    fn render_view_to_string(view_ref: ViewRef, cx: &ViewContext) -> String {
+    fn render_view_to_string(&self, view_ref: ViewRef, cx: &ViewContext) -> String {
+        let (cx, _) = cx.get_ordered(view_ref.order);
         cx.prepare();
-        let (cx, view) = cx.get_ordered(view_ref.id);
-        let node = view.render(cx.as_ref());
+        let node = Arc::clone(&cx).retrieve_last_render();
 
-        Self::render_node_to_string(node, &cx)
+        self.render_node_to_string(node, &cx)
     }
 
-    fn render_node_to_string(node: Node, cx: &ViewContext) -> String {
+    fn render_node_to_string(&self, node: Node, cx: &ViewContext) -> String {
         match node {
-            Node::Element(node) => Self::render_element_node_to_string(*node, cx),
+            Node::Element(node) => self.render_element_node_to_string(*node, cx),
             Node::Text(text) => text.0,
-            Node::ViewRef(view) => Self::render_view_to_string(*view, cx),
+            Node::ViewRef(view) => self.render_view_to_string(*view, cx),
         }
     }
 
-    fn render_element_node_to_string(node: ElementNode, cx: &ViewContext) -> String {
+    fn render_element_node_to_string(&self, node: ElementNode, cx: &ViewContext) -> String {
         let mut buffer = String::new();
 
         buffer.push('<');
@@ -48,10 +58,32 @@ impl Renderer {
             buffer.push('"');
         }
 
+        if !node.events.is_empty() {
+            buffer.push(' ');
+            buffer.push_str("data-id");
+            buffer.push('=');
+            buffer.push('"');
+            buffer.push_str(&node.id.to_string());
+            buffer.push('"');
+
+            buffer.push(' ');
+            buffer.push_str("data-events");
+            buffer.push('=');
+            buffer.push('"');
+            buffer.push_str(
+                &node
+                    .events
+                    .into_keys()
+                    .reduce(|acc, s| format!("{acc},{s}"))
+                    .unwrap(),
+            );
+            buffer.push('"');
+        }
+
         buffer.push('>');
 
         for child in node.children {
-            buffer.push_str(&Self::render_node_to_string(child, cx));
+            buffer.push_str(&self.render_node_to_string(child, cx));
         }
 
         buffer.push('<');
