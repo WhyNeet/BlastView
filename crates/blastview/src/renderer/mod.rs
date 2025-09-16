@@ -29,7 +29,6 @@ impl Renderer {
 
     fn render_view_to_string(&self, view_ref: ViewRef, cx: &ViewContext) -> String {
         let (cx, _) = cx.get_ordered(view_ref.order);
-        cx.prepare();
         let node = Arc::clone(&cx).retrieve_last_render();
 
         self.render_node_to_string(node, &cx)

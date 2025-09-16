@@ -73,14 +73,15 @@ impl ViewContext {
         self.registry.insert(Arc::clone(&context), view);
 
         let (cx, view) = self.get_ordered(view_ref.order);
-        *cx.last_render.lock().unwrap() = Some(RenderableView::render(view.as_ref(), &cx));
+        let tree = RenderableView::render(view.as_ref(), &cx);
+        self.register_node_events(&tree, Arc::clone(&cx));
+        *cx.last_render.lock().unwrap() = Some(tree);
 
         view_ref
     }
 
-    pub(crate) fn retrieve_last_render(self: Arc<Self>) -> Node {
+    pub(crate) fn retrieve_last_render(&self) -> Node {
         let node = self.last_render.lock().unwrap().take().unwrap();
-        Arc::clone(&self).register_node_events(&node, self);
         node
     }
 
