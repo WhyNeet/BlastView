@@ -1,6 +1,9 @@
 use std::{
     any::Any,
-    sync::{Arc, Mutex, atomic::AtomicUsize},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize},
+    },
 };
 
 pub trait StateValue: Send + Sync {
@@ -25,7 +28,7 @@ impl<T: Send + Sync + PartialEq + Clone + 'static> StateValue for T {
 #[derive(Default)]
 pub struct ViewContextState {
     state: Mutex<Vec<Arc<dyn StateValue>>>,
-    is_dirty: Mutex<bool>,
+    is_dirty: AtomicBool,
     current_order: AtomicUsize,
 }
 
@@ -50,7 +53,8 @@ impl ViewContextState {
             return;
         }
 
-        *self.is_dirty.lock().unwrap() = true;
+        self.is_dirty
+            .store(true, std::sync::atomic::Ordering::Relaxed);
         *prev_value = Arc::new(value);
     }
 
@@ -65,6 +69,11 @@ impl ViewContextState {
     }
 
     pub fn is_dirty(&self) -> bool {
-        *self.is_dirty.lock().unwrap()
+        self.is_dirty.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn clean(&self) {
+        self.is_dirty
+            .store(false, std::sync::atomic::Ordering::Relaxed);
     }
 }

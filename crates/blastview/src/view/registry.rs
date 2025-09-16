@@ -1,25 +1,19 @@
 use std::sync::{Arc, Mutex, atomic::AtomicUsize};
 
-use crate::view::{RenderableView, View, context::ViewContext};
+use crate::view::context::ViewContext;
 
 #[derive(Default)]
 pub struct OrderedViewRegistry {
-    views: Mutex<Vec<(Arc<ViewContext>, Arc<dyn RenderableView + Send + Sync>)>>,
+    views: Mutex<Vec<Arc<ViewContext>>>,
     current_order: AtomicUsize,
 }
 
 impl OrderedViewRegistry {
-    pub fn insert<V>(&self, cx: Arc<ViewContext>, view: V)
-    where
-        V: View + Send + Sync + 'static,
-    {
-        self.views.lock().unwrap().push((cx, Arc::new(view)));
+    pub fn insert(&self, cx: Arc<ViewContext>) {
+        self.views.lock().unwrap().push(cx);
     }
 
-    pub fn retrieve(
-        &self,
-        order: usize,
-    ) -> Option<(Arc<ViewContext>, Arc<dyn RenderableView + Send + Sync>)> {
+    pub fn retrieve(&self, order: usize) -> Option<Arc<ViewContext>> {
         self.views.lock().unwrap().get(order).cloned()
     }
 

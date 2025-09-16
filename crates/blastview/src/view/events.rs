@@ -21,13 +21,4 @@ impl GlobalEventsRegistry {
     pub fn remove(&self, id: &str) {
         self.mapping.remove(id);
     }
-
-    pub fn all_events<F>(&self, mut f: F)
-    where
-        F: FnMut(&str),
-    {
-        for entry in self.mapping.iter() {
-            f(entry.key());
-        }
-    }
 }

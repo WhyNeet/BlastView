@@ -8,7 +8,7 @@ use crate::{
     view::{context::ViewContext, registry::ViewRef},
 };
 
-pub struct Renderer {
+pub(crate) struct Renderer {
     root_context: Arc<ViewContext>,
     root_view: ViewRef,
 }
@@ -28,13 +28,13 @@ impl Renderer {
     }
 
     fn render_view_to_string(&self, view_ref: ViewRef, cx: &ViewContext) -> String {
-        let (cx, _) = cx.get_ordered(view_ref.order);
+        let cx = cx.get_ordered(view_ref.order);
         let node = Arc::clone(&cx).retrieve_last_render();
 
         self.render_node_to_string(node, &cx)
     }
 
-    fn render_node_to_string(&self, node: Node, cx: &ViewContext) -> String {
+    pub(crate) fn render_node_to_string(&self, node: Node, cx: &ViewContext) -> String {
         match node {
             Node::Element(node) => self.render_element_node_to_string(*node, cx),
             Node::Text(text) => text.0,

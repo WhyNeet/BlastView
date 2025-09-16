@@ -11,7 +11,7 @@ impl StaticRenderer {
         V: View + Send + Sync + 'static,
         F: Fn() -> V,
     {
-        let root_cx = ViewContext::new(0, Default::default());
+        let root_cx = ViewContext::new(Default::default(), Default::default(), Default::default());
         let view_ref = root_cx.create(factory);
 
         Self::render_view_to_string(view_ref, &root_cx)
@@ -19,8 +19,14 @@ impl StaticRenderer {
 
     fn render_view_to_string(view_ref: ViewRef, cx: &ViewContext) -> String {
         cx.prepare();
-        let (cx, view) = cx.get_ordered(view_ref.order);
-        let node = view.render(cx.as_ref());
+        let cx = cx.get_ordered(view_ref.order);
+        let node = cx
+            .view
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .render(cx.as_ref());
 
         Self::render_node_to_string(node, &cx)
     }
