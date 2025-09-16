@@ -1,10 +1,9 @@
-use std::{
-    collections::HashMap,
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicUsize, Ordering},
-    },
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicUsize, Ordering},
 };
+
+use dashmap::DashMap;
 
 use crate::{
     node::Node,
@@ -17,10 +16,10 @@ use crate::{
 
 pub struct ViewContext {
     order: usize,
-    registry: Arc<Mutex<OrderedViewRegistry>>,
+    registry: Arc<OrderedViewRegistry>,
     current_order: AtomicUsize,
     event_registry: Arc<GlobalEventsRegistry>,
-    handlers: Arc<Mutex<HashMap<String, Arc<dyn Fn() + Send + Sync>>>>,
+    handlers: DashMap<String, Arc<dyn Fn() + Send + Sync>>,
     last_render: Arc<Mutex<Option<Node>>>,
 }
 
@@ -41,12 +40,12 @@ impl ViewContext {
     }
 
     fn unregister_handlers(&self) {
-        let mut handlers = self.handlers.lock().unwrap();
-        for (event, _) in handlers.iter() {
+        for entry in self.handlers.iter() {
+            let event = entry.key();
             tracing::debug!("unregister event: {event}");
             self.event_registry.remove(event);
         }
-        *handlers = Default::default();
+        self.handlers.clear();
     }
 
     pub fn create<V, F>(&self, factory: F) -> ViewRef
@@ -56,7 +55,7 @@ impl ViewContext {
     {
         let order = self.get_order();
 
-        if let Some((cx, view)) = self.registry.lock().unwrap().retrieve(order) {
+        if let Some((cx, view)) = self.registry.retrieve(order) {
             cx.prepare();
             cx.unregister_handlers();
             let view_ref = ViewRef { order: cx.order };
@@ -71,10 +70,7 @@ impl ViewContext {
 
         let view_ref = ViewRef { order };
 
-        self.registry
-            .lock()
-            .unwrap()
-            .insert(Arc::clone(&context), view);
+        self.registry.insert(Arc::clone(&context), view);
 
         let (cx, view) = self.get_ordered(view_ref.order);
         *cx.last_render.lock().unwrap() = Some(RenderableView::render(view.as_ref(), &cx));
@@ -98,8 +94,7 @@ impl ViewContext {
                     tracing::debug!("[{}] event registered: {event_name}", node.tag);
                     {
                         let cx = cx.clone();
-                        let mut cx_handlers = cx.handlers.lock().unwrap();
-                        cx_handlers.insert(event_name.clone(), Arc::clone(handler));
+                        cx.handlers.insert(event_name.clone(), Arc::clone(handler));
                     }
 
                     {
@@ -117,7 +112,7 @@ impl ViewContext {
     }
 
     pub(crate) fn dispatch_event(&self, event: String) {
-        if let Some(handler) = self.handlers.lock().unwrap().get(&event) {
+        if let Some(handler) = self.handlers.get(&event) {
             handler();
         } else if let Some(cx) = self.event_registry.get(&event) {
             cx.dispatch_event(event);
@@ -128,7 +123,7 @@ impl ViewContext {
         &self,
         order: usize,
     ) -> (Arc<ViewContext>, Arc<dyn RenderableView + Send + Sync>) {
-        self.registry.lock().unwrap().retrieve(order).unwrap()
+        self.registry.retrieve(order).unwrap()
     }
 
     fn get_order(&self) -> usize {
