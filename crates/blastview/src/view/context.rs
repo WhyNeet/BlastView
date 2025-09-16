@@ -1,7 +1,4 @@
-use std::sync::{
-    Arc, Mutex,
-    atomic::{AtomicUsize, Ordering},
-};
+use std::sync::{Arc, Mutex};
 
 use dashmap::DashMap;
 
@@ -11,13 +8,14 @@ use crate::{
         RenderableView, View,
         events::GlobalEventsRegistry,
         registry::{OrderedViewRegistry, ViewRef},
+        state::ViewContextState,
     },
 };
 
 pub struct ViewContext {
     order: usize,
     registry: Arc<OrderedViewRegistry>,
-    current_order: AtomicUsize,
+    state: Arc<ViewContextState>,
     event_registry: Arc<GlobalEventsRegistry>,
     handlers: DashMap<String, Arc<dyn Fn() + Send + Sync>>,
     last_render: Arc<Mutex<Option<Node>>>,
@@ -28,15 +26,16 @@ impl ViewContext {
         Self {
             order,
             registry: Default::default(),
-            current_order: Default::default(),
             event_registry,
             handlers: Default::default(),
+            state: Default::default(),
             last_render: Default::default(),
         }
     }
 
     pub(crate) fn prepare(&self) {
-        self.current_order.store(0, Ordering::Relaxed);
+        self.registry.reset_order();
+        self.state.reset_order();
     }
 
     fn unregister_handlers(&self) {
@@ -53,7 +52,7 @@ impl ViewContext {
         F: Fn() -> V,
         V: View + Send + Sync + 'static,
     {
-        let order = self.get_order();
+        let order = self.registry.get_order();
 
         if let Some((cx, view)) = self.registry.retrieve(order) {
             cx.prepare();
@@ -78,6 +77,26 @@ impl ViewContext {
         *cx.last_render.lock().unwrap() = Some(tree);
 
         view_ref
+    }
+
+    pub fn use_state<T>(&self, initial_value: T) -> (T, Arc<dyn Fn(T) + Send + Sync>)
+    where
+        T: Send + Sync + PartialEq + Clone + 'static,
+    {
+        let order = self.state.get_order();
+        let setter_state = Arc::clone(&self.state);
+        let setter = Arc::new(move |value| {
+            setter_state.set(order, value);
+            if setter_state.is_dirty() {
+                tracing::debug!("dirty state, re-render client");
+            }
+        });
+        if let Some(value) = self.state.get(order) {
+            (value, setter)
+        } else {
+            self.state.insert(initial_value);
+            (self.state.get::<T>(order).unwrap(), setter)
+        }
     }
 
     pub(crate) fn retrieve_last_render(&self) -> Node {
@@ -120,14 +139,10 @@ impl ViewContext {
         }
     }
 
-    pub fn get_ordered(
+    pub(crate) fn get_ordered(
         &self,
         order: usize,
     ) -> (Arc<ViewContext>, Arc<dyn RenderableView + Send + Sync>) {
         self.registry.retrieve(order).unwrap()
-    }
-
-    fn get_order(&self) -> usize {
-        self.current_order.fetch_add(1, Ordering::Relaxed)
     }
 }

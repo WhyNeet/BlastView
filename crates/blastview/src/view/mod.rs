@@ -3,6 +3,7 @@ use crate::{node::Node, view::context::ViewContext};
 pub mod context;
 pub(crate) mod events;
 pub(crate) mod registry;
+pub(crate) mod state;
 
 pub trait RenderableView {
     fn render(&self, cx: &ViewContext) -> Node;
