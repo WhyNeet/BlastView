@@ -7,7 +7,10 @@ use axum::{
     },
     response::IntoResponse,
 };
-use blastview::{session::LiveSession, view::View};
+use blastview::{
+    session::{LiveSession, patch::Patch},
+    view::View,
+};
 use futures::{SinkExt, StreamExt};
 
 pub async fn live_handler<V, F>(
@@ -26,12 +29,21 @@ where
     V: View + Send + Sync + 'static,
     F: Fn() -> V + Send + Sync,
 {
-    let session = LiveSession::new(|| factory());
+    let (session, patch_rx) = LiveSession::new(|| factory());
+    let session = Arc::new(session);
+    Arc::clone(&session).begin_re_render_task();
 
     let (mut sender, mut receiver) = socket.split();
 
     sender
-        .send(Message::Text(session.dynamic_render().into()))
+        .send(Message::Text(
+            serde_json::to_string(&Patch::ReplaceInner {
+                selector: "#app".to_string(),
+                html: session.dynamic_render(),
+            })
+            .unwrap()
+            .into(),
+        ))
         .await
         .unwrap();
 
@@ -42,7 +54,14 @@ where
         }
     });
 
-    let send_task = tokio::spawn(async move {});
+    let send_task = tokio::spawn(async move {
+        while let Ok(patch) = patch_rx.recv() {
+            sender
+                .send(Message::Text(serde_json::to_string(&patch).unwrap().into()))
+                .await
+                .unwrap();
+        }
+    });
 
     recv_task.await.unwrap();
     send_task.await.unwrap();

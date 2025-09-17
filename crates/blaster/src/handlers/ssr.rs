@@ -21,34 +21,13 @@ where
             <body>
                 <div id="app">{}</div>
                 <script>
-                const root = document.getElementById("app");
-                const ws = new WebSocket("http://127.0.0.1:8080/__ws");
-                ws.addEventListener("message", (e) => {{
-                const html = e.data;
-                root.innerHTML = html;
-                setupEventListeners();
-                }});
-                function setupEventListeners() {{
-                            document.querySelectorAll('[data-id]').forEach(element => {{
-                                const events = element.dataset.events.split(",");
-                                events.forEach(eventType => element.addEventListener(eventType, handleEvent));
-                            }});
-                        }}
-
-                        function handleEvent(e) {{
-                            const dataId = e.target.getAttribute('data-id');
-                            const eventType = e.type;
-                            const eventId = `${{dataId}}_${{eventType}}`;
-
-                            if (ws.readyState === WebSocket.OPEN) {{
-                                ws.send(eventId);
-                            }}
-                        }}
+                {}
                 </script>
             </body>
             </html>
         "#,
-        StaticRenderer::render_to_string(|| factory())
+        StaticRenderer::render_to_string(|| factory()),
+        include_str!("../js/script.js")
     );
 
     tracing::debug!("serving ssr content");
