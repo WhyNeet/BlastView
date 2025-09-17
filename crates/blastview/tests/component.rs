@@ -25,6 +25,6 @@ fn view_rendering_works() {
 
     let renderer = Renderer::new(Arc::clone(&context), root_view);
     let html =
-        renderer.render_node_to_string(RenderableView::render(&MyView, &context).into(), &context);
+        renderer.render_node_to_string(&RenderableView::render(&MyView, &context).into(), &context);
     assert_eq!(html, r#"<div class="container">Hello world!</div>"#);
 }

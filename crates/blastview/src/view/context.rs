@@ -22,7 +22,7 @@ pub struct ViewContext {
     state: Arc<ViewContextState>,
     event_registry: Arc<GlobalEventsRegistry>,
     handlers: DashMap<String, Arc<dyn Fn() + Send + Sync>>,
-    last_render: Arc<Mutex<Option<Node>>>,
+    last_render: Mutex<Option<Arc<Node>>>,
     context_registry: Arc<ContextRegistry>,
     pub(crate) view: Mutex<Option<Arc<dyn RenderableView + Send + Sync>>>,
 }
@@ -98,7 +98,7 @@ impl ViewContext {
         let tree =
             RenderableView::render(self.view.lock().unwrap().as_ref().unwrap().as_ref(), &self);
         self.register_node_events(&tree, Arc::clone(&self));
-        *self.last_render.lock().unwrap() = Some(tree);
+        *self.last_render.lock().unwrap() = Some(Arc::new(tree));
     }
 
     pub fn use_state<T>(&self, initial_value: T) -> (T, Arc<dyn Fn(T) + Send + Sync>)
@@ -124,8 +124,8 @@ impl ViewContext {
         }
     }
 
-    pub(crate) fn retrieve_last_render(&self) -> Node {
-        let node = self.last_render.lock().unwrap().take().unwrap();
+    pub(crate) fn retrieve_last_render(&self) -> Arc<Node> {
+        let node = self.last_render.lock().unwrap().as_ref().cloned().unwrap();
         node
     }
 

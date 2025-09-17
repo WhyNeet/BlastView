@@ -6,10 +6,12 @@ ws.addEventListener("message", (e) => {
     const patch = JSON.parse(e.data);
     switch (patch["type"]) {
       case "ReplaceInner":
-        const element = document.querySelector(patch["selector"]);
-        cleanupEventListeners(element);
-        element.innerHTML = patch["html"];
-        setupEventListeners(element);
+        const elements = document.querySelectorAll(patch["selector"]);
+        elements.forEach((element) => {
+          cleanupEventListeners(element);
+          element.innerHTML = patch["html"];
+          setupEventListeners(element);
+        });
         break;
     }
   }

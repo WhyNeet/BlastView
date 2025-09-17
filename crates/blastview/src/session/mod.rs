@@ -105,7 +105,7 @@ impl LiveSession {
             let cx = self.context_registry.get(&view_id).unwrap();
             Arc::clone(&cx).trigger_render();
             let tree = cx.retrieve_last_render();
-            let view_string = self.renderer.render_node_to_string(tree, &cx);
+            let view_string = self.renderer.render_node_to_string(&tree, &cx);
             self.patch_sender
                 .send(Patch::ReplaceInner {
                     selector: format!(r#"bv-view[data-view="{}"]"#, cx.id),

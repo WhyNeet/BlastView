@@ -31,19 +31,19 @@ impl Renderer {
         format!(
             r#"<bv-view data-view="{}">{}</bv-view>"#,
             cx.id,
-            self.render_node_to_string(node, &cx)
+            self.render_node_to_string(&node, &cx)
         )
     }
 
-    pub fn render_node_to_string(&self, node: Node, cx: &ViewContext) -> String {
+    pub fn render_node_to_string(&self, node: &Node, cx: &ViewContext) -> String {
         match node {
-            Node::Element(node) => self.render_element_node_to_string(*node, cx),
+            Node::Element(node) => self.render_element_node_to_string(&node, cx),
             Node::Text(text) => html_escape::encode_text(&text.0).to_string(),
-            Node::ViewRef(view) => self.render_view_to_string(*view, cx),
+            Node::ViewRef(view) => self.render_view_to_string(*view.as_ref(), cx),
         }
     }
 
-    fn render_element_node_to_string(&self, node: ElementNode, cx: &ViewContext) -> String {
+    fn render_element_node_to_string(&self, node: &ElementNode, cx: &ViewContext) -> String {
         let mut buffer = String::new();
 
         buffer.push('<');
@@ -76,7 +76,8 @@ impl Renderer {
             buffer.push_str(
                 &node
                     .events
-                    .into_keys()
+                    .keys()
+                    .cloned()
                     .reduce(|acc, s| format!("{acc},{s}"))
                     .unwrap(),
             );
@@ -85,7 +86,7 @@ impl Renderer {
 
         buffer.push('>');
 
-        for child in node.children {
+        for child in node.children.iter() {
             buffer.push_str(&self.render_node_to_string(child, cx));
         }
 
