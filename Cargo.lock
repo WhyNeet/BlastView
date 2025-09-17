@@ -436,6 +436,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "html_escape"
+version = "0.1.0"
+dependencies = [
+ "blaster",
+ "blastview",
+ "tokio",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "http"
 version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

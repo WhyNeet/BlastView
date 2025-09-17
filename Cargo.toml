@@ -1,3 +1,3 @@
 [workspace]
 resolver = "3"
-members = [ "crates/blaster","crates/blastview", "examples/counter", "examples/events", "examples/hello_world"]
+members = [ "crates/blaster","crates/blastview", "examples/counter", "examples/events", "examples/hello_world", "examples/html_escape"]
