@@ -1,4 +1,7 @@
-use blastview::{node::Node, view::View};
+use blastview::{
+    node::Node,
+    view::{View, ViewContext},
+};
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
     fmt,
@@ -24,7 +27,7 @@ async fn main() -> std::io::Result<()> {
 struct EventView;
 
 impl View for EventView {
-    fn render(&self, _: &blastview::view::context::ViewContext) -> impl Into<Node> {
+    fn render(&self, _: &impl ViewContext) -> impl Into<Node> {
         Node::new("div")
             .attr("class", "container")
             .child(click_event_button())

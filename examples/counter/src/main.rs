@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use blastview::{
     node::Node,
-    view::{View, context::ViewRef},
+    view::{View, ViewContext, ViewRef},
 };
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
@@ -29,9 +29,9 @@ async fn main() -> std::io::Result<()> {
 struct AppView;
 
 impl View for AppView {
-    fn render(&self, cx: &blastview::view::context::ViewContext) -> impl Into<Node> {
-        let counter_view = cx.create(|| CounterView);
-        let auto_counter_view = cx.create(|| AutoIncrementCounterView);
+    fn render(&self, cx: &impl ViewContext) -> impl Into<Node> {
+        let counter_view = cx.create_view(|| CounterView);
+        let auto_counter_view = cx.create_view(|| AutoIncrementCounterView);
 
         Node::new("main")
             .child(view_wrapper("Counter", counter_view))
@@ -51,16 +51,14 @@ fn view_wrapper(view_name: &str, view: ViewRef) -> impl Into<Node> {
 struct CounterView;
 
 impl View for CounterView {
-    fn render(&self, cx: &blastview::view::context::ViewContext) -> impl Into<Node> {
+    fn render(&self, cx: &impl ViewContext) -> impl Into<Node> {
         let (count, set_count) = cx.use_state(0);
 
-        let set_count_decrement = Arc::clone(&set_count);
         Node::new("div")
-            .child(
-                Node::new("button")
-                    .child(format!("Sub"))
-                    .on("click", move || set_count_decrement(count - 1)),
-            )
+            .child(Node::new("button").child(format!("Sub")).on("click", {
+                let set_count = Arc::clone(&set_count);
+                move || set_count(count - 1)
+            }))
             .child(count.to_string())
             .child(
                 Node::new("button")
@@ -73,7 +71,7 @@ impl View for CounterView {
 struct AutoIncrementCounterView;
 
 impl View for AutoIncrementCounterView {
-    fn render(&self, cx: &blastview::view::context::ViewContext) -> impl Into<Node> {
+    fn render(&self, cx: &impl ViewContext) -> impl Into<Node> {
         let (count, set_count) = cx.use_state(0);
 
         tokio::spawn(async move {
