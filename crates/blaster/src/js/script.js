@@ -1,5 +1,6 @@
 const root = document.getElementById("app");
-const ws = new WebSocket("http://127.0.0.1:8080/__ws");
+const ws = new WebSocket("http://127.0.0.1:8080/__ws/$SESSION_ID");
+ws.addEventListener("open", () => setupEventListeners(document));
 ws.addEventListener("message", (e) => {
   {
     const patch = JSON.parse(e.data);

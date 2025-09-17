@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use axum::{
     extract::{
-        State, WebSocketUpgrade,
+        Path, State, WebSocketUpgrade,
         ws::{Message, WebSocket},
     },
+    http::StatusCode,
     response::IntoResponse,
 };
 use blastview::{
@@ -12,40 +13,39 @@ use blastview::{
     view::View,
 };
 use futures::{SinkExt, StreamExt};
+use uuid::Uuid;
+
+use crate::state::AppState;
 
 pub async fn live_handler<V, F>(
     ws: WebSocketUpgrade,
-    State(factory): State<Arc<F>>,
+    Path(session_id): Path<String>,
+    State(state): State<Arc<AppState<V, F>>>,
 ) -> impl IntoResponse
 where
     V: View + Send + Sync + 'static,
     F: Fn() -> V + Send + Sync + 'static,
 {
-    ws.on_upgrade(async |socket| handle_ws(socket, factory).await)
+    let Some(session) = Uuid::parse_str(&session_id)
+        .ok()
+        .and_then(|id| state.sessions.remove(&id))
+    else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    ws.on_upgrade(async |socket| handle_ws::<V, F>(socket, session.1).await)
+        .into_response()
 }
 
-async fn handle_ws<V, F>(socket: WebSocket, factory: Arc<F>)
+async fn handle_ws<V, F>(socket: WebSocket, session: (LiveSession, flume::Receiver<Patch>))
 where
     V: View + Send + Sync + 'static,
     F: Fn() -> V + Send + Sync,
 {
-    let (session, patch_rx) = LiveSession::new(|| factory());
+    let (session, patch_rx) = session;
     let session = Arc::new(session);
     Arc::clone(&session).begin_re_render_task();
 
     let (mut sender, mut receiver) = socket.split();
-
-    sender
-        .send(Message::Text(
-            serde_json::to_string(&Patch::ReplaceInner {
-                selector: "#app".to_string(),
-                html: session.dynamic_render(),
-            })
-            .unwrap()
-            .into(),
-        ))
-        .await
-        .unwrap();
 
     let recv_task = tokio::spawn(async move {
         while let Some(Ok(message)) = receiver.next().await {

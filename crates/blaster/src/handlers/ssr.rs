@@ -4,13 +4,24 @@ use axum::{
     extract::State,
     response::{Html, IntoResponse},
 };
-use blastview::{renderer::StaticRenderer, view::View};
+use blastview::{session::LiveSession, view::View};
+use uuid::Uuid;
 
-pub async fn ssr_handler<V, F>(State(factory): State<Arc<F>>) -> impl IntoResponse
+use crate::state::AppState;
+
+pub async fn ssr_handler<V, F>(State(state): State<Arc<AppState<V, F>>>) -> impl IntoResponse
 where
     V: View + Send + Sync + 'static,
     F: Fn() -> V + Send + Sync,
 {
+    let factory = Arc::clone(&state.factory);
+    let session_id = Uuid::new_v4();
+    let session = LiveSession::new(|| factory());
+    let html = session.0.dynamic_render();
+    state.sessions.insert(session_id, session);
+    let hydration_script =
+        include_str!("../js/script.js").replace("$SESSION_ID", &session_id.to_string());
+
     let html = format!(
         r#"
             <!DOCTYPE html>
@@ -26,8 +37,7 @@ where
             </body>
             </html>
         "#,
-        StaticRenderer::render_to_string(|| factory()),
-        include_str!("../js/script.js")
+        html, hydration_script
     );
 
     tracing::debug!("serving ssr content");
