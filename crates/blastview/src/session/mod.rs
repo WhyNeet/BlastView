@@ -1,4 +1,5 @@
 pub(crate) mod context_registry;
+pub mod patch;
 
 use std::{
     sync::{
@@ -13,7 +14,7 @@ use uuid::Uuid;
 
 use crate::{
     renderer::Renderer,
-    session::context_registry::ContextRegistry,
+    session::{context_registry::ContextRegistry, patch::Patch},
     view::{View, context::ViewContext},
 };
 
@@ -35,10 +36,11 @@ pub struct LiveSession {
     renderer: Renderer,
     re_render_notifier: Arc<Notify>,
     last_re_render_time: AtomicU64,
+    patch_sender: flume::Sender<Patch>,
 }
 
 impl LiveSession {
-    pub fn new<V, F>(factory: F) -> Self
+    pub fn new<V, F>(factory: F) -> (Self, flume::Receiver<Patch>)
     where
         V: View + Send + Sync + 'static,
         F: Fn() -> V + Send + Sync,
@@ -57,14 +59,20 @@ impl LiveSession {
 
         let renderer = Renderer::new(Arc::clone(&context), root_view);
 
-        Self {
-            context,
-            renderer,
-            re_render_notifier: Default::default(),
-            last_re_render_time: Default::default(),
-            rendering_context,
-            context_registry,
-        }
+        let (patch_tx, patch_rx) = flume::unbounded();
+
+        (
+            Self {
+                context,
+                renderer,
+                re_render_notifier: Default::default(),
+                last_re_render_time: Default::default(),
+                rendering_context,
+                context_registry,
+                patch_sender: patch_tx,
+            },
+            patch_rx,
+        )
     }
 
     pub fn dispatch_event(&self, event: String) {
@@ -98,7 +106,12 @@ impl LiveSession {
             Arc::clone(&cx).trigger_render();
             let tree = cx.retrieve_last_render();
             let view_string = self.renderer.render_node_to_string(tree, &cx);
-            todo!("send to client: {view_string}")
+            self.patch_sender
+                .send(Patch::ReplaceInner {
+                    selector: format!(r#"bv-view[data-view="{}"]"#, cx.id),
+                    html: view_string,
+                })
+                .unwrap();
         }
 
         self.last_re_render_time.store(

@@ -31,7 +31,11 @@ impl Renderer {
         let cx = cx.get_ordered(view_ref.order);
         let node = Arc::clone(&cx).retrieve_last_render();
 
-        self.render_node_to_string(node, &cx)
+        format!(
+            r#"<bv-view data-view="{}">{}</bv-view>"#,
+            cx.id,
+            self.render_node_to_string(node, &cx)
+        )
     }
 
     pub(crate) fn render_node_to_string(&self, node: Node, cx: &ViewContext) -> String {

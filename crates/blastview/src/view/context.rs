@@ -15,7 +15,7 @@ use crate::{
 };
 
 pub struct ViewContext {
-    id: Uuid,
+    pub(crate) id: Uuid,
     rendering_context: Arc<RenderingContext>,
     registry: Arc<OrderedViewRegistry>,
     state: Arc<ViewContextState>,
