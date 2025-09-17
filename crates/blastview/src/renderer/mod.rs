@@ -50,6 +50,9 @@ impl Renderer {
         buffer.push_str(&node.tag);
 
         for (attr, value) in node.attrs.iter() {
+            if attr.starts_with("on") {
+                continue;
+            }
             buffer.push(' ');
             buffer.push_str(attr);
             buffer.push('=');
