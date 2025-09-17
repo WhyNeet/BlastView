@@ -35,6 +35,7 @@ impl View for AppView {
 
         Node::new("main")
             .child(view_wrapper("Counter", counter_view))
+            .child(view_wrapper("Counter 2", counter_view))
             .child(Node::new("hr"))
             .child(view_wrapper("Auto-increment counter", auto_counter_view))
     }
