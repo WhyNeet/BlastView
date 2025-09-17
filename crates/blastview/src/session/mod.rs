@@ -15,25 +15,25 @@ use uuid::Uuid;
 use crate::{
     renderer::Renderer,
     session::{context_registry::ContextRegistry, patch::Patch},
-    view::{View, context::ViewContext},
+    view::{View, context::Context, events::Event},
 };
 
 #[derive(Default)]
-pub(crate) struct RenderingContext {
+pub struct RenderingQueue {
     render_queue: Mutex<Vec<Uuid>>,
 }
 
-impl RenderingContext {
+impl RenderingQueue {
     pub(crate) fn enqueue(&self, id: Uuid) {
         self.render_queue.lock().unwrap().push(id);
     }
 }
 
 pub struct LiveSession {
-    context: Arc<ViewContext>,
-    rendering_context: Arc<RenderingContext>,
-    context_registry: Arc<ContextRegistry>,
+    context: Arc<Context>,
     renderer: Renderer,
+    rendering_queue: Arc<RenderingQueue>,
+    context_registry: Arc<ContextRegistry>,
     re_render_notifier: Arc<Notify>,
     last_re_render_time: AtomicU64,
     patch_sender: flume::Sender<Patch>,
@@ -45,19 +45,14 @@ impl LiveSession {
         V: View + Send + Sync + 'static,
         F: Fn() -> V + Send + Sync,
     {
-        let events_registry = Default::default();
-        let rendering_context = Default::default();
+        let rendering_queue = Default::default();
         let context_registry = Default::default();
-        let context = ViewContext::new(
-            Arc::clone(&events_registry),
-            Arc::clone(&rendering_context),
+        let context = Context::new(
+            Arc::new(factory()),
             Arc::clone(&context_registry),
+            Arc::clone(&rendering_queue),
         );
-        let root_view = context.create(factory);
-
-        let context = Arc::new(context);
-
-        let renderer = Renderer::new(Arc::clone(&context), root_view);
+        let renderer = Renderer::new(Arc::clone(&context));
 
         let (patch_tx, patch_rx) = flume::unbounded();
 
@@ -65,10 +60,10 @@ impl LiveSession {
             Self {
                 context,
                 renderer,
+                rendering_queue,
+                context_registry,
                 re_render_notifier: Default::default(),
                 last_re_render_time: Default::default(),
-                rendering_context,
-                context_registry,
                 patch_sender: patch_tx,
             },
             patch_rx,
@@ -76,35 +71,26 @@ impl LiveSession {
     }
 
     pub fn dispatch_event(&self, event: String) {
-        self.context.dispatch_event(event);
+        let (node_id, event) = event.split_at(36);
+        let event = Event {
+            event: event[1..].to_string(),
+            node_id: node_id.parse().unwrap(),
+        };
+        self.context.dispatch_event(&event);
     }
 
     pub fn dynamic_render(&self) -> String {
-        self.context.prepare();
         self.renderer.render_to_string()
     }
 
     async fn process_re_render_queue(&self) {
-        if self
-            .rendering_context
-            .render_queue
-            .lock()
-            .unwrap()
-            .is_empty()
-        {
+        if self.rendering_queue.render_queue.lock().unwrap().is_empty() {
             return;
         }
 
-        for view_id in self
-            .rendering_context
-            .render_queue
-            .lock()
-            .unwrap()
-            .drain(..)
-        {
+        for view_id in self.rendering_queue.render_queue.lock().unwrap().drain(..) {
             let cx = self.context_registry.get(&view_id).unwrap();
-            Arc::clone(&cx).trigger_render();
-            let tree = cx.retrieve_last_render();
+            let tree = cx.force_render();
             let view_string = self.renderer.render_node_to_string(&tree, &cx);
             self.patch_sender
                 .send(Patch::ReplaceInner {

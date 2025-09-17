@@ -1,9 +1,6 @@
 use std::{
     any::Any,
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, AtomicUsize},
-    },
+    sync::{Arc, Mutex, atomic::AtomicBool},
 };
 
 pub trait StateValue: Send + Sync {
@@ -11,7 +8,7 @@ pub trait StateValue: Send + Sync {
     fn eq(&self, other: &dyn StateValue) -> bool;
 }
 
-impl<T: Send + Sync + PartialEq + Clone + 'static> StateValue for T {
+impl<T: Send + Sync + PartialEq + 'static> StateValue for T {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -26,53 +23,44 @@ impl<T: Send + Sync + PartialEq + Clone + 'static> StateValue for T {
 }
 
 #[derive(Default)]
-pub struct ViewContextState {
+pub struct StateRegistry {
     state: Mutex<Vec<Arc<dyn StateValue>>>,
     is_dirty: AtomicBool,
-    current_order: AtomicUsize,
 }
 
-impl ViewContextState {
-    pub fn insert(&self, value: impl StateValue + 'static) {
-        self.state.lock().unwrap().push(Arc::new(value));
+impl StateRegistry {
+    pub fn register(&self, value: impl StateValue + 'static) -> Arc<dyn StateValue> {
+        let value: Arc<dyn StateValue> = Arc::new(value);
+        self.state.lock().unwrap().push(Arc::clone(&value));
+        value
     }
 
-    pub fn get<T: Send + Sync + PartialEq + Clone + 'static>(&self, idx: usize) -> Option<T> {
-        self.state
-            .lock()
-            .unwrap()
-            .get(idx)
-            .and_then(|val| val.as_any().downcast_ref::<T>())
-            .cloned()
+    pub fn get<T: Send + Sync + PartialEq + 'static>(
+        &self,
+        idx: usize,
+    ) -> Option<Arc<dyn StateValue>> {
+        self.state.lock().unwrap().get(idx).cloned()
     }
 
-    pub fn set<T: Send + Sync + PartialEq + Clone + 'static>(&self, idx: usize, value: T) {
+    pub fn update<T: Send + Sync + PartialEq + 'static>(&self, idx: usize, value: T) -> bool {
         let mut state = self.state.lock().unwrap();
         let prev_value = state.get_mut(idx).unwrap();
         if prev_value.eq(&value) {
-            return;
+            return false;
         }
 
         self.is_dirty
             .store(true, std::sync::atomic::Ordering::Relaxed);
         *prev_value = Arc::new(value);
-    }
 
-    pub fn reset_order(&self) {
-        self.current_order
-            .store(0, std::sync::atomic::Ordering::Relaxed);
-    }
-
-    pub fn get_order(&self) -> usize {
-        self.current_order
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        true
     }
 
     pub fn is_dirty(&self) -> bool {
         self.is_dirty.load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    pub fn clean(&self) {
+    pub fn mark_clean(&self) {
         self.is_dirty
             .store(false, std::sync::atomic::Ordering::Relaxed);
     }

@@ -1,34 +1,25 @@
-use std::sync::{Arc, Mutex, atomic::AtomicUsize};
+use std::sync::{Arc, Mutex};
 
-use crate::view::context::ViewContext;
+use crate::view::context::Context;
 
 #[derive(Default)]
 pub struct OrderedViewRegistry {
-    views: Mutex<Vec<Arc<ViewContext>>>,
-    current_order: AtomicUsize,
+    views: Mutex<Vec<Arc<Context>>>,
 }
 
 impl OrderedViewRegistry {
-    pub fn insert(&self, cx: Arc<ViewContext>) {
+    pub fn register(&self, cx: Arc<Context>) {
         self.views.lock().unwrap().push(cx);
     }
 
-    pub fn retrieve(&self, order: usize) -> Option<Arc<ViewContext>> {
+    pub fn get(&self, order: usize) -> Option<Arc<Context>> {
         self.views.lock().unwrap().get(order).cloned()
     }
 
-    pub fn reset_order(&self) {
-        self.current_order
-            .store(0, std::sync::atomic::Ordering::Relaxed);
+    pub fn each<F>(&self, f: F)
+    where
+        F: Fn(&Context),
+    {
+        self.views.lock().unwrap().iter().for_each(|cx| f(&cx));
     }
-
-    pub fn get_order(&self) -> usize {
-        self.current_order
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ViewRef {
-    pub(crate) order: usize,
 }

@@ -3,19 +3,19 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use uuid::Uuid;
 
-use crate::view::context::ViewContext;
+use crate::view::context::Context;
 
 #[derive(Default)]
-pub(crate) struct ContextRegistry {
-    mapping: DashMap<Uuid, Arc<ViewContext>>,
+pub struct ContextRegistry {
+    mapping: DashMap<Uuid, Arc<Context>>,
 }
 
 impl ContextRegistry {
-    pub fn insert(&self, id: Uuid, cx: Arc<ViewContext>) {
+    pub fn register(&self, id: Uuid, cx: Arc<Context>) {
         self.mapping.insert(id, cx);
     }
 
-    pub fn get(&self, id: &Uuid) -> Option<Arc<ViewContext>> {
+    pub fn get(&self, id: &Uuid) -> Option<Arc<Context>> {
         self.mapping.get(id).map(|val| Arc::clone(&val))
     }
 }

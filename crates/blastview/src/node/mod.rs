@@ -1,6 +1,6 @@
 use uuid::Uuid;
 
-use crate::view::registry::ViewRef;
+use crate::view::ViewRef;
 use std::{collections::HashMap, sync::Arc};
 
 pub enum Node {

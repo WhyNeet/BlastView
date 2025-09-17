@@ -2,31 +2,26 @@ use std::sync::Arc;
 
 use crate::{
     node::{ElementNode, Node},
-    view::{context::ViewContext, registry::ViewRef},
+    view::context::Context,
 };
 
 pub struct Renderer {
-    root_context: Arc<ViewContext>,
-    root_view: ViewRef,
+    root_context: Arc<Context>,
 }
 
 impl Renderer {
-    pub fn new(root_context: Arc<ViewContext>, root_view: ViewRef) -> Self {
-        Self {
-            root_context,
-            root_view,
-        }
+    pub fn new(root_context: Arc<Context>) -> Self {
+        Self { root_context }
     }
 }
 
 impl Renderer {
     pub fn render_to_string(&self) -> String {
-        self.render_view_to_string(self.root_view, &self.root_context)
+        self.render_view_to_string(&self.root_context)
     }
 
-    fn render_view_to_string(&self, view_ref: ViewRef, cx: &ViewContext) -> String {
-        let cx = cx.get_ordered(view_ref.order);
-        let node = Arc::clone(&cx).retrieve_last_render();
+    fn render_view_to_string(&self, cx: &Context) -> String {
+        let node = cx.render();
 
         format!(
             r#"<bv-view data-view="{}">{}</bv-view>"#,
@@ -35,15 +30,15 @@ impl Renderer {
         )
     }
 
-    pub fn render_node_to_string(&self, node: &Node, cx: &ViewContext) -> String {
+    pub fn render_node_to_string(&self, node: &Node, cx: &Context) -> String {
         match node {
             Node::Element(node) => self.render_element_node_to_string(&node, cx),
             Node::Text(text) => html_escape::encode_text(&text.0).to_string(),
-            Node::ViewRef(view) => self.render_view_to_string(*view.as_ref(), cx),
+            Node::ViewRef(view) => self.render_view_to_string(&cx.get_child(view.order).unwrap()),
         }
     }
 
-    fn render_element_node_to_string(&self, node: &ElementNode, cx: &ViewContext) -> String {
+    fn render_element_node_to_string(&self, node: &ElementNode, cx: &Context) -> String {
         let mut buffer = String::new();
 
         buffer.push('<');

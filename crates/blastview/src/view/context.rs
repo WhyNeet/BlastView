@@ -1,170 +1,186 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicUsize, Ordering},
+};
 
-use dashmap::DashMap;
 use uuid::Uuid;
 
 use crate::{
     node::Node,
-    session::{RenderingContext, context_registry::ContextRegistry},
+    session::{RenderingQueue, context_registry::ContextRegistry},
     view::{
-        RenderableView, View, events::GlobalEventsRegistry, registry::OrderedViewRegistry,
-        state::ViewContextState,
+        RenderableView, ViewRef,
+        events::{Event, EventRegistry},
+        registry::OrderedViewRegistry,
+        state::StateRegistry,
     },
 };
 
-pub use super::registry::ViewRef;
-
-#[derive(Default)]
-pub struct ViewContext {
+pub struct Context {
     pub(crate) id: Uuid,
-    rendering_context: Arc<RenderingContext>,
-    registry: Arc<OrderedViewRegistry>,
-    state: Arc<ViewContextState>,
-    event_registry: Arc<GlobalEventsRegistry>,
-    handlers: DashMap<String, Arc<dyn Fn() + Send + Sync>>,
-    last_render: Mutex<Option<Arc<Node>>>,
+
     context_registry: Arc<ContextRegistry>,
-    pub(crate) view: Mutex<Option<Arc<dyn RenderableView + Send + Sync>>>,
+    rendering_queue: Arc<RenderingQueue>,
+
+    children: OrderedViewRegistry,
+    view_registration_order: AtomicUsize,
+
+    event_registry: EventRegistry,
+
+    state_registry: Arc<StateRegistry>,
+    state_registration_order: AtomicUsize,
+
+    last_render: Mutex<Option<Arc<Node>>>,
+    view: Arc<dyn RenderableView + Send + Sync>,
 }
 
-impl ViewContext {
-    pub(crate) fn new(
-        event_registry: Arc<GlobalEventsRegistry>,
-        rendering_context: Arc<RenderingContext>,
+impl Context {
+    pub fn new(
+        view: Arc<dyn RenderableView + Send + Sync>,
         context_registry: Arc<ContextRegistry>,
-    ) -> Self {
-        Self {
-            id: Uuid::new_v4(),
-            registry: Default::default(),
-            event_registry,
-            rendering_context,
-            handlers: Default::default(),
-            state: Default::default(),
+        rendering_queue: Arc<RenderingQueue>,
+    ) -> Arc<Self> {
+        let id = Uuid::new_v4();
+
+        let cx = Arc::new(Self {
+            id,
+
+            context_registry: Arc::clone(&context_registry),
+            rendering_queue,
+
+            children: OrderedViewRegistry::default(),
+            view_registration_order: AtomicUsize::default(),
+
+            event_registry: EventRegistry::default(),
+
+            state_registry: Default::default(),
+            state_registration_order: AtomicUsize::default(),
+
             last_render: Default::default(),
-            view: Default::default(),
-            context_registry,
-        }
+            view,
+        });
+
+        context_registry.register(id, Arc::clone(&cx));
+
+        cx
     }
 
-    pub(crate) fn prepare(&self) {
-        self.registry.reset_order();
-        self.state.reset_order();
-    }
-
-    fn unregister_handlers(&self) {
-        for entry in self.handlers.iter() {
-            let event = entry.key();
-            tracing::debug!("unregister event: {event}");
-            self.event_registry.remove(event);
-        }
-        self.handlers.clear();
-    }
-
-    pub fn create<V, F>(&self, factory: F) -> ViewRef
+    pub(crate) fn create_view<V, F>(&self, factory: F) -> ViewRef
     where
+        V: RenderableView + Send + Sync + 'static,
         F: Fn() -> V,
-        V: View + Send + Sync + 'static,
     {
-        let order = self.registry.get_order();
+        let order = self.view_registration_order.fetch_add(1, Ordering::Relaxed);
 
-        if let Some(cx) = self.registry.retrieve(order) {
-            cx.trigger_render();
+        if let Some(cx) = self.children.get(order) {
+            cx.force_render();
             return ViewRef { order };
         }
-        let context = ViewContext::new(
-            Arc::clone(&self.event_registry),
-            Arc::clone(&self.rendering_context),
+
+        let view = Arc::new(factory());
+        let context = Context::new(
+            view,
             Arc::clone(&self.context_registry),
+            Arc::clone(&self.rendering_queue),
         );
-        let context = Arc::new(context);
-        self.context_registry
-            .insert(context.id, Arc::clone(&context));
-        let view = factory();
-        *context.view.lock().unwrap() = Some(Arc::new(view));
 
-        let view_ref = ViewRef { order };
+        context.force_render();
 
-        self.registry.insert(Arc::clone(&context));
+        self.children.register(context);
 
-        context.trigger_render();
-
-        view_ref
+        ViewRef { order }
     }
 
-    pub(crate) fn trigger_render(self: Arc<Self>) {
-        self.prepare();
-        self.unregister_handlers();
-        self.state.clean();
-        let tree =
-            RenderableView::render(self.view.lock().unwrap().as_ref().unwrap().as_ref(), &self);
-        self.register_node_events(&tree, Arc::clone(&self));
-        *self.last_render.lock().unwrap() = Some(Arc::new(tree));
+    fn prepare_render(&self) {
+        self.view_registration_order.store(0, Ordering::SeqCst);
+        self.state_registration_order.store(0, Ordering::SeqCst);
+        self.state_registry.mark_clean();
     }
 
-    pub fn use_state<T>(&self, initial_value: T) -> (T, Arc<dyn Fn(T) + Send + Sync>)
-    where
-        T: Send + Sync + PartialEq + Clone + 'static,
-    {
-        let order = self.state.get_order();
-        let setter_state = Arc::clone(&self.state);
-        let view_id = self.id;
-        let rendering_context = Arc::clone(&self.rendering_context);
-        let setter = Arc::new(move |value| {
-            setter_state.set(order, value);
-            if setter_state.is_dirty() {
-                tracing::debug!("dirty state");
-                rendering_context.enqueue(view_id);
+    fn unregister_events(&self) {
+        self.event_registry.clear();
+    }
+
+    pub(crate) fn render(&self) -> Arc<Node> {
+        if let Some(last_render) = &*self.last_render.lock().unwrap() {
+            return Arc::clone(last_render);
+        }
+
+        self.force_render()
+    }
+
+    pub(crate) fn force_render(&self) -> Arc<Node> {
+        let mut last_render = self.last_render.lock().unwrap();
+
+        self.prepare_render();
+        // for now, atomic node event operations are not possible - diffing is not yet implemented
+        self.unregister_events();
+
+        let tree = self.view.render(self);
+        self.register_events(&tree);
+        let tree = Arc::new(tree);
+        *last_render = Some(Arc::clone(&tree));
+        tree
+    }
+
+    pub(crate) fn use_state<T: Send + Sync + PartialEq + Clone + 'static>(
+        &self,
+        initial_value: T,
+    ) -> (T, Arc<dyn Fn(T) + Send + Sync>) {
+        let order = self
+            .state_registration_order
+            .fetch_add(1, Ordering::Relaxed);
+
+        let state_registry = Arc::clone(&self.state_registry);
+        let rendering_queue = Arc::clone(&self.rendering_queue);
+        let id = self.id;
+        let update: Arc<dyn Fn(T) + Send + Sync> = Arc::new(move |value| {
+            if state_registry.update(order, value) {
+                rendering_queue.enqueue(id);
             }
         });
-        if let Some(value) = self.state.get(order) {
-            (value, setter)
-        } else {
-            self.state.insert(initial_value);
-            (self.state.get::<T>(order).unwrap(), setter)
+
+        if let Some(state) = self.state_registry.get::<T>(order) {
+            return (state.as_any().downcast_ref::<T>().unwrap().clone(), update);
         }
+
+        self.state_registry.register(initial_value.clone());
+
+        (initial_value, update)
     }
 
-    pub(crate) fn retrieve_last_render(&self) -> Arc<Node> {
-        let node = self.last_render.lock().unwrap().as_ref().cloned().unwrap();
-        node
-    }
-
-    fn register_node_events(&self, node: &Node, context: Arc<ViewContext>) {
+    fn register_events(&self, node: &Node) {
         match node {
             Node::Element(node) => {
-                let cx = context.clone();
                 for (event, handler) in node.events.iter() {
-                    let cx = Arc::clone(&cx);
-                    let event_name = format!("{}_{event}", node.id);
-                    tracing::debug!("[{}] event registered: {event_name}", node.tag);
-                    {
-                        let cx = cx.clone();
-                        cx.handlers.insert(event_name.clone(), Arc::clone(handler));
-                    }
-
-                    {
-                        let cx_for_event_reg = cx.clone();
-                        cx.event_registry.insert(event_name, cx_for_event_reg);
-                    }
+                    let event = Event {
+                        node_id: node.id,
+                        event: event.to_string(),
+                    };
+                    tracing::debug!("[{}] event registered: {event:?}", node.tag);
+                    self.event_registry
+                        .register(event.clone(), Arc::clone(handler));
                 }
 
                 for child in node.children.iter() {
-                    self.register_node_events(child, Arc::clone(&context));
+                    self.register_events(child);
                 }
             }
+            // ignore text elements
+            // child views have already registered their own events
             _ => {}
         }
     }
 
-    pub(crate) fn dispatch_event(&self, event: String) {
-        if let Some(handler) = self.handlers.get(&event) {
+    pub(crate) fn dispatch_event(&self, event: &Event) {
+        if let Some(handler) = self.event_registry.get(event) {
             handler();
-        } else if let Some(cx) = self.event_registry.get(&event) {
-            cx.dispatch_event(event);
         }
+
+        self.children.each(|cx| cx.dispatch_event(&event));
     }
 
-    pub(crate) fn get_ordered(&self, order: usize) -> Arc<ViewContext> {
-        self.registry.retrieve(order).unwrap()
+    pub(crate) fn get_child(&self, idx: usize) -> Option<Arc<Context>> {
+        self.children.get(idx)
     }
 }

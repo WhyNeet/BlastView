@@ -1,24 +1,33 @@
 use std::sync::Arc;
 
 use dashmap::DashMap;
-
-use crate::view::context::ViewContext;
+use uuid::Uuid;
 
 #[derive(Default)]
-pub struct GlobalEventsRegistry {
-    mapping: DashMap<String, Arc<ViewContext>>,
+pub struct EventRegistry {
+    mapping: DashMap<Event, Arc<dyn Fn() + Send + Sync>>,
 }
 
-impl GlobalEventsRegistry {
-    pub fn insert(&self, id: String, cx: Arc<ViewContext>) {
-        self.mapping.insert(id, cx);
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct Event {
+    pub node_id: Uuid,
+    pub event: String,
+}
+
+impl EventRegistry {
+    pub fn register(&self, event: Event, cx: Arc<dyn Fn() + Send + Sync>) {
+        self.mapping.insert(event, cx);
     }
 
-    pub fn get(&self, id: &str) -> Option<Arc<ViewContext>> {
-        self.mapping.get(id).map(|cx| Arc::clone(&cx))
+    pub fn get(&self, event: &Event) -> Option<Arc<dyn Fn() + Send + Sync>> {
+        self.mapping.get(event).map(|cx| Arc::clone(&cx))
     }
 
-    pub fn remove(&self, id: &str) {
-        self.mapping.remove(id);
+    pub fn unregister(&self, event: &Event) {
+        self.mapping.remove(event);
+    }
+
+    pub fn clear(&self) {
+        self.mapping.clear();
     }
 }
