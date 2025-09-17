@@ -7,13 +7,14 @@ use crate::{
     node::Node,
     session::{RenderingContext, context_registry::ContextRegistry},
     view::{
-        RenderableView, View,
-        events::GlobalEventsRegistry,
-        registry::{OrderedViewRegistry, ViewRef},
+        RenderableView, View, events::GlobalEventsRegistry, registry::OrderedViewRegistry,
         state::ViewContextState,
     },
 };
 
+pub use super::registry::ViewRef;
+
+#[derive(Default)]
 pub struct ViewContext {
     pub(crate) id: Uuid,
     rendering_context: Arc<RenderingContext>,

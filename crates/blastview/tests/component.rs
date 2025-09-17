@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use blastview::{
     node::Node,
-    renderer::StaticRenderer,
-    view::{View, context::ViewContext},
+    renderer::Renderer,
+    session::LiveSession,
+    view::{RenderableView, View, context::ViewContext},
 };
 
 #[test]
@@ -15,6 +18,13 @@ fn view_rendering_works() {
         }
     }
 
-    let output = StaticRenderer::render_to_string(|| MyView);
-    assert_eq!(output, r#"<div class="container">Hello world!</div>"#);
+    let context = ViewContext::default();
+    let root_view = context.create(|| MyView);
+
+    let context = Arc::new(context);
+
+    let renderer = Renderer::new(Arc::clone(&context), root_view);
+    let html =
+        renderer.render_node_to_string(RenderableView::render(&MyView, &context).into(), &context);
+    assert_eq!(html, r#"<div class="container">Hello world!</div>"#);
 }

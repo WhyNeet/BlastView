@@ -1,6 +1,3 @@
-mod static_rendering;
-pub use static_rendering::*;
-
 use std::sync::Arc;
 
 use crate::{
@@ -8,7 +5,7 @@ use crate::{
     view::{context::ViewContext, registry::ViewRef},
 };
 
-pub(crate) struct Renderer {
+pub struct Renderer {
     root_context: Arc<ViewContext>,
     root_view: ViewRef,
 }
@@ -38,10 +35,10 @@ impl Renderer {
         )
     }
 
-    pub(crate) fn render_node_to_string(&self, node: Node, cx: &ViewContext) -> String {
+    pub fn render_node_to_string(&self, node: Node, cx: &ViewContext) -> String {
         match node {
             Node::Element(node) => self.render_element_node_to_string(*node, cx),
-            Node::Text(text) => text.0,
+            Node::Text(text) => html_escape::encode_text(&text.0).to_string(),
             Node::ViewRef(view) => self.render_view_to_string(*view, cx),
         }
     }
@@ -57,7 +54,7 @@ impl Renderer {
             buffer.push_str(attr);
             buffer.push('=');
             buffer.push('"');
-            buffer.push_str(value);
+            buffer.push_str(&html_escape::encode_quoted_attribute(value).to_string());
             buffer.push('"');
         }
 
