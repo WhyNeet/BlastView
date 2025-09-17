@@ -27,10 +27,16 @@ impl View for CounterView {
     fn render(&self, cx: &blastview::view::context::ViewContext) -> impl Into<Node> {
         let (count, set_count) = cx.use_state(0);
 
-        Node::new("div").attr("class", "container").child(
-            Node::new("button")
-                .child(format!("count: {count}"))
-                .on("click", move || set_count(count + 1)),
-        )
+        Node::new("div")
+            .attr("class", "container")
+            .child(
+                Node::new("button")
+                    .child(format!("count: {count}"))
+                    .on("click", move || set_count(count + 1)),
+            )
+            .child(Node::new("p").child(format!(
+                "Count is {}",
+                if count % 2 == 0 { "even" } else { "odd" }
+            )))
     }
 }
