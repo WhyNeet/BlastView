@@ -13,6 +13,7 @@ use blastview::{
     view::View,
 };
 use futures::{SinkExt, StreamExt};
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::state::AppState;
@@ -47,22 +48,40 @@ where
 
     let (mut sender, mut receiver) = socket.split();
 
+    let token = CancellationToken::new();
+
     let recv_task = tokio::spawn(async move {
         while let Some(Ok(message)) = receiver.next().await {
-            let event = message.to_text().unwrap();
-            session.dispatch_event(event.to_string());
+            match message {
+                Message::Text(event) => {
+                    let event = event.as_str().to_string();
+                    session.dispatch_event(event);
+                }
+                Message::Close(_) => {
+                    break;
+                }
+                _ => {}
+            }
         }
     });
 
-    let send_task = tokio::spawn(async move {
-        while let Ok(patch) = patch_rx.recv() {
-            sender
-                .send(Message::Text(serde_json::to_string(&patch).unwrap().into()))
-                .await
-                .unwrap();
+    let send_task_token = token.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+              Ok(patch) = patch_rx.recv_async() => {
+                sender
+                    .send(Message::Text(serde_json::to_string(&patch).unwrap().into()))
+                    .await
+                    .unwrap();
+              },
+              _ = send_task_token.cancelled() => {
+                break;
+              }
+            }
         }
     });
 
     recv_task.await.unwrap();
-    send_task.await.unwrap();
+    token.cancel();
 }
