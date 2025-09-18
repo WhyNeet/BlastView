@@ -1,7 +1,4 @@
-use blastview::{
-    node::Node,
-    view::{View, ViewContext},
-};
+use blastview::{context::ViewContext, node::Node, view::View};
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
     fmt,

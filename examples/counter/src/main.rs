@@ -1,8 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
 use blastview::{
+    context::ViewContext,
     node::Node,
-    view::{View, ViewContext, ViewRef},
+    use_state,
+    view::{View, ViewRef},
 };
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
@@ -52,7 +54,7 @@ struct CounterView;
 
 impl View for CounterView {
     fn render(&self, cx: &impl ViewContext) -> impl Into<Node> {
-        let (count, set_count) = cx.use_state(0);
+        let (count, set_count) = use_state!(cx, 0);
 
         Node::new("div")
             .child(Node::new("button").child(format!("Sub")).on("click", {
