@@ -76,10 +76,24 @@ impl View for AutoIncrementCounterView {
     fn render(&self, cx: &impl ViewContext) -> impl Into<Node> {
         let (count, set_count) = cx.use_state(0);
 
-        tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            set_count(count + 1);
-        });
+        cx.use_effect(
+            move || {
+                let set_count = set_count.clone();
+                let task = tokio::spawn(async move {
+                    let mut interval = tokio::time::interval(Duration::from_secs(1));
+                    interval.tick().await;
+                    let mut current_count = 0;
+                    loop {
+                        interval.tick().await;
+                        set_count(current_count + 1);
+                        current_count += 1;
+                    }
+                });
+
+                Some(Box::new(move || task.abort()))
+            },
+            [] as [u8; 0],
+        );
 
         Node::new("div").child(format!("Count is: {}", count.to_string()))
     }
