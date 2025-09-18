@@ -1,13 +1,7 @@
 pub(crate) mod context_registry;
 pub mod patch;
 
-use std::{
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
-    },
-    time::UNIX_EPOCH,
-};
+use std::sync::{Arc, Mutex};
 
 use tokio::sync::Notify;
 use uuid::Uuid;
@@ -35,7 +29,6 @@ pub struct LiveSession {
     rendering_queue: Arc<RenderingQueue>,
     context_registry: Arc<ContextRegistry>,
     re_render_notifier: Arc<Notify>,
-    last_re_render_time: AtomicU64,
     patch_sender: flume::Sender<Patch>,
 }
 
@@ -63,7 +56,6 @@ impl LiveSession {
                 rendering_queue,
                 context_registry,
                 re_render_notifier: Default::default(),
-                last_re_render_time: Default::default(),
                 patch_sender: patch_tx,
             },
             patch_rx,
@@ -89,6 +81,9 @@ impl LiveSession {
         }
 
         for view_id in self.rendering_queue.render_queue.lock().unwrap().drain(..) {
+            if self.patch_sender.is_disconnected() {
+                return;
+            }
             let cx = self.context_registry.get(&view_id).unwrap();
             let tree = cx.force_render();
             let view_string = self.renderer.render_node_to_string(&tree, &cx);
@@ -99,14 +94,6 @@ impl LiveSession {
                 })
                 .unwrap();
         }
-
-        self.last_re_render_time.store(
-            std::time::SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
-            Ordering::Relaxed,
-        );
     }
 
     pub fn begin_re_render_task(self: Arc<Self>) {
