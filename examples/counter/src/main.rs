@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use blastview::{
     context::ViewContext,
     node::Node,
-    use_state,
+    use_effect, use_state,
     view::{View, ViewRef},
 };
 use tracing_subscriber::{
@@ -76,24 +76,21 @@ impl View for AutoIncrementCounterView {
     fn render(&self, cx: &impl ViewContext) -> impl Into<Node> {
         let (count, set_count) = cx.use_state(0);
 
-        cx.use_effect(
-            move || {
-                let set_count = set_count.clone();
-                let task = tokio::spawn(async move {
-                    let mut interval = tokio::time::interval(Duration::from_secs(1));
+        use_effect!(cx, move || {
+            let set_count = set_count.clone();
+            let task = tokio::spawn(async move {
+                let mut interval = tokio::time::interval(Duration::from_secs(1));
+                interval.tick().await;
+                let mut current_count = 0;
+                loop {
                     interval.tick().await;
-                    let mut current_count = 0;
-                    loop {
-                        interval.tick().await;
-                        set_count(current_count + 1);
-                        current_count += 1;
-                    }
-                });
+                    set_count(current_count + 1);
+                    current_count += 1;
+                }
+            });
 
-                Some(Box::new(move || task.abort()))
-            },
-            [] as [u8; 0],
-        );
+            Some(Box::new(move || task.abort()))
+        });
 
         Node::new("div").child(format!("Count is: {}", count.to_string()))
     }
