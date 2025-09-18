@@ -18,4 +18,8 @@ impl ContextRegistry {
     pub fn get(&self, id: &Uuid) -> Option<Arc<Context>> {
         self.mapping.get(id).map(|val| Arc::clone(&val))
     }
+
+    pub fn clear(&self) {
+        self.mapping.clear();
+    }
 }

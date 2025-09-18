@@ -60,4 +60,8 @@ impl StateRegistry {
         self.is_dirty
             .store(false, std::sync::atomic::Ordering::Relaxed);
     }
+
+    pub fn clear(&self) {
+        self.state.lock().unwrap().clear();
+    }
 }

@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::sync::Arc;
 
 use crate::context::Context;
@@ -13,6 +14,11 @@ pub trait ViewContext {
         &self,
         initial_value: T,
     ) -> (T, Arc<dyn Fn(T) + Send + Sync>);
+
+    fn use_effect<F, T>(&self, f: F, deps: T)
+    where
+        F: (Fn() -> Option<Box<dyn FnOnce() + Send + Sync>>) + Send + Sync + 'static,
+        T: Hash;
 }
 
 impl ViewContext for Context {
@@ -29,5 +35,13 @@ impl ViewContext for Context {
         initial_value: T,
     ) -> (T, Arc<dyn Fn(T) + Send + Sync>) {
         self.use_state(initial_value)
+    }
+
+    fn use_effect<F, T>(&self, f: F, deps: T)
+    where
+        F: (Fn() -> Option<Box<dyn FnOnce() + Send + Sync>>) + Send + Sync + 'static,
+        T: Hash,
+    {
+        self.use_effect(f, deps);
     }
 }

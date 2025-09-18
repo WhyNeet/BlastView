@@ -1,8 +1,12 @@
-use std::sync::{
-    Arc, Mutex,
-    atomic::{AtomicUsize, Ordering},
+use std::{
+    hash::Hash,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
+pub(crate) mod effects;
 pub mod events;
 mod public_api;
 pub(crate) mod registry;
@@ -16,6 +20,7 @@ use uuid::Uuid;
 use crate::{
     context::{
         context_registry::ContextRegistry,
+        effects::{Effect, EffectRegistry},
         events::{Event, EventRegistry},
         registry::OrderedViewRegistry,
         state::StateRegistry,
@@ -38,6 +43,9 @@ pub struct Context {
 
     state_registry: Arc<StateRegistry>,
     state_registration_order: AtomicUsize,
+
+    effect_registry: EffectRegistry,
+    effect_registration_order: AtomicUsize,
 
     last_render: Mutex<Option<Arc<Node>>>,
     view: Arc<dyn RenderableView + Send + Sync>,
@@ -64,6 +72,9 @@ impl Context {
 
             state_registry: Default::default(),
             state_registration_order: AtomicUsize::default(),
+
+            effect_registry: EffectRegistry::default(),
+            effect_registration_order: AtomicUsize::default(),
 
             last_render: Default::default(),
             view,
@@ -103,6 +114,7 @@ impl Context {
     fn prepare_render(&self) {
         self.view_registration_order.store(0, Ordering::SeqCst);
         self.state_registration_order.store(0, Ordering::SeqCst);
+        self.effect_registration_order.store(0, Ordering::SeqCst);
         self.state_registry.mark_clean();
     }
 
@@ -158,6 +170,27 @@ impl Context {
         (initial_value, update)
     }
 
+    pub(crate) fn use_effect<F, T>(&self, f: F, deps: T)
+    where
+        F: (Fn() -> Option<Box<dyn FnOnce() + Send + Sync>>) + Send + Sync + 'static,
+        T: Hash,
+    {
+        let order = self
+            .effect_registration_order
+            .fetch_add(1, Ordering::Relaxed);
+
+        if let Some(effect) = self.effect_registry.get(order) {
+            if self.effect_registry.update_deps(order, &deps) {
+                effect.run();
+            }
+            return;
+        }
+
+        let effect = Effect::new(f, deps);
+        effect.run();
+        self.effect_registry.register(effect);
+    }
+
     fn register_events(&self, node: &Node) {
         match node {
             Node::Element(node) => {
@@ -191,5 +224,13 @@ impl Context {
 
     pub fn get_child(&self, idx: usize) -> Option<Arc<Context>> {
         self.children.get(idx)
+    }
+}
+
+impl Drop for Context {
+    fn drop(&mut self) {
+        self.effect_registry.clear();
+        self.event_registry.clear();
+        self.state_registry.clear();
     }
 }
