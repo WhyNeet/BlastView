@@ -170,10 +170,11 @@ impl Context {
         (initial_value, update)
     }
 
-    pub(crate) fn use_effect<F, T>(&self, f: F, deps: T)
+    pub(crate) fn use_effect<F, T, C>(&self, f: F, deps: T)
     where
-        F: (Fn() -> Option<Box<dyn FnOnce() + Send + Sync>>) + Send + Sync + 'static,
+        F: (Fn() -> C) + Send + Sync + 'static,
         T: Hash,
+        C: FnOnce() + Send + Sync + 'static,
     {
         let order = self
             .effect_registration_order
@@ -186,7 +187,7 @@ impl Context {
             return;
         }
 
-        let effect = Effect::new(f, deps);
+        let effect = Effect::new(move || Box::new(f()), deps);
         effect.run();
         self.effect_registry.register(effect);
     }

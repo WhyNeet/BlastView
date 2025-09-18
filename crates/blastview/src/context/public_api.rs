@@ -15,10 +15,11 @@ pub trait ViewContext {
         initial_value: T,
     ) -> (T, Arc<dyn Fn(T) + Send + Sync>);
 
-    fn use_effect<F, T>(&self, f: F, deps: T)
+    fn use_effect<F, T, C>(&self, f: F, deps: T)
     where
-        F: (Fn() -> Option<Box<dyn FnOnce() + Send + Sync>>) + Send + Sync + 'static,
-        T: Hash;
+        F: (Fn() -> C) + Send + Sync + 'static,
+        T: Hash,
+        C: FnOnce() + Send + Sync + 'static;
 }
 
 impl ViewContext for Context {
@@ -37,10 +38,11 @@ impl ViewContext for Context {
         self.use_state(initial_value)
     }
 
-    fn use_effect<F, T>(&self, f: F, deps: T)
+    fn use_effect<F, T, C>(&self, f: F, deps: T)
     where
-        F: (Fn() -> Option<Box<dyn FnOnce() + Send + Sync>>) + Send + Sync + 'static,
+        F: (Fn() -> C) + Send + Sync + 'static,
         T: Hash,
+        C: FnOnce() + Send + Sync + 'static,
     {
         self.use_effect(f, deps);
     }
