@@ -67,23 +67,47 @@ impl LiveSession {
     }
 
     async fn process_re_render_queue(&self) {
-        if self.rendering_queue.render_queue.lock().unwrap().is_empty() {
+        if self.rendering_queue.render_queue.lock().unwrap().is_empty()
+            && self
+                .rendering_queue
+                .deferred_queue
+                .lock()
+                .unwrap()
+                .is_empty()
+        {
             return;
         }
 
-        for view_id in self.rendering_queue.render_queue.lock().unwrap().drain(..) {
+        let process_view = |view_id: uuid::Uuid| {
             if self.patch_sender.is_disconnected() {
                 return;
             }
             let cx = self.context_registry.get(&view_id).unwrap();
             let tree = cx.force_render();
             let view_string = self.renderer.render_node_to_string(&tree, &cx);
+            if self.patch_sender.is_disconnected() {
+                return;
+            }
             self.patch_sender
                 .send(Patch::ReplaceInner {
                     selector: format!(r#"bv-view[data-view="{}"]"#, cx.id),
                     html: view_string,
                 })
                 .unwrap();
+        };
+
+        for view_id in self.rendering_queue.render_queue.lock().unwrap().drain(..) {
+            process_view(view_id);
+        }
+
+        for view_id in self
+            .rendering_queue
+            .deferred_queue
+            .lock()
+            .unwrap()
+            .drain(..)
+        {
+            process_view(view_id);
         }
     }
 
