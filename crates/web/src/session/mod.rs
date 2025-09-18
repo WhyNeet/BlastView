@@ -1,28 +1,15 @@
-pub(crate) mod context_registry;
 pub mod patch;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use tokio::sync::Notify;
-use uuid::Uuid;
-
-use crate::{
-    context::{Context, events::Event},
-    renderer::Renderer,
-    session::{context_registry::ContextRegistry, patch::Patch},
+use blastview::{
+    context::{Context, context_registry::ContextRegistry, events::Event},
+    rendering::RenderingQueue,
     view::View,
 };
+use tokio::sync::Notify;
 
-#[derive(Default)]
-pub struct RenderingQueue {
-    render_queue: Mutex<Vec<Uuid>>,
-}
-
-impl RenderingQueue {
-    pub(crate) fn enqueue(&self, id: Uuid) {
-        self.render_queue.lock().unwrap().push(id);
-    }
-}
+use crate::{Renderer, session::patch::Patch};
 
 pub struct LiveSession {
     context: Arc<Context>,

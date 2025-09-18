@@ -100,3 +100,43 @@ impl Into<Node> for ViewRef {
         Node::ViewRef(Box::new(self))
     }
 }
+
+pub trait RenderableElement {
+    fn id(&self) -> Uuid;
+    fn tag(&self) -> &str;
+    fn attrs(&self) -> &HashMap<String, String>;
+    fn events(&self) -> &HashMap<String, Arc<dyn Fn() + Send + Sync>>;
+    fn children(&self) -> &[Node];
+}
+
+impl RenderableElement for ElementNode {
+    fn id(&self) -> Uuid {
+        self.id
+    }
+
+    fn tag(&self) -> &str {
+        &self.tag
+    }
+
+    fn attrs(&self) -> &HashMap<String, String> {
+        &self.attrs
+    }
+
+    fn events(&self) -> &HashMap<String, Arc<dyn Fn() + Send + Sync>> {
+        &self.events
+    }
+
+    fn children(&self) -> &[Node] {
+        &self.children
+    }
+}
+
+pub trait RenderableText {
+    fn text(&self) -> &str;
+}
+
+impl RenderableText for TextNode {
+    fn text(&self) -> &str {
+        &self.0
+    }
+}

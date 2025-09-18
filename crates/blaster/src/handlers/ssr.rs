@@ -4,8 +4,9 @@ use axum::{
     extract::State,
     response::{Html, IntoResponse},
 };
-use blastview::{session::LiveSession, view::View};
+use blastview::view::View;
 use uuid::Uuid;
+use web::session::LiveSession;
 
 use crate::state::AppState;
 

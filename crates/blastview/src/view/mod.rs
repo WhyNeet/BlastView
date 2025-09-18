@@ -19,5 +19,5 @@ impl<V: View> RenderableView for V {
 
 #[derive(Debug, Clone, Copy)]
 pub struct ViewRef {
-    pub(crate) order: usize,
+    pub order: usize,
 }

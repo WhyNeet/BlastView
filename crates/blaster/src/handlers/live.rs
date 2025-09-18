@@ -8,13 +8,11 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use blastview::{
-    session::{LiveSession, patch::Patch},
-    view::View,
-};
+use blastview::view::View;
 use futures::{SinkExt, StreamExt};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+use web::session::{LiveSession, patch::Patch};
 
 use crate::state::AppState;
 

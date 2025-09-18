@@ -1,5 +1,4 @@
 pub mod context;
 pub mod node;
-pub mod renderer;
-pub mod session;
+pub mod rendering;
 pub mod view;

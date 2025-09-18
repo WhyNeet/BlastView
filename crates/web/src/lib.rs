@@ -1,8 +1,10 @@
+pub mod session;
+
 use std::sync::Arc;
 
-use crate::{
+use blastview::{
     context::Context,
-    node::{ElementNode, Node},
+    node::{ElementNode, Node, RenderableElement, RenderableText},
 };
 
 pub struct Renderer {
@@ -33,7 +35,9 @@ impl Renderer {
     pub fn render_node_to_string(&self, node: &Node, cx: &Context) -> String {
         match node {
             Node::Element(node) => self.render_element_node_to_string(&node, cx),
-            Node::Text(text) => html_escape::encode_text(&text.0).to_string(),
+            Node::Text(text) => {
+                html_escape::encode_text(RenderableText::text(text.as_ref())).to_string()
+            }
             Node::ViewRef(view) => self.render_view_to_string(&cx.get_child(view.order).unwrap()),
         }
     }
@@ -42,9 +46,9 @@ impl Renderer {
         let mut buffer = String::new();
 
         buffer.push('<');
-        buffer.push_str(&node.tag);
+        buffer.push_str(RenderableElement::tag(node));
 
-        for (attr, value) in node.attrs.iter() {
+        for (attr, value) in RenderableElement::attrs(node).iter() {
             if attr.starts_with("on") {
                 continue;
             }
@@ -56,12 +60,12 @@ impl Renderer {
             buffer.push('"');
         }
 
-        if !node.events.is_empty() {
+        if !RenderableElement::events(node).is_empty() {
             buffer.push(' ');
             buffer.push_str("data-id");
             buffer.push('=');
             buffer.push('"');
-            buffer.push_str(&node.id.to_string());
+            buffer.push_str(&RenderableElement::id(node).to_string());
             buffer.push('"');
 
             buffer.push(' ');
@@ -69,8 +73,7 @@ impl Renderer {
             buffer.push('=');
             buffer.push('"');
             buffer.push_str(
-                &node
-                    .events
+                &RenderableElement::events(node)
                     .keys()
                     .cloned()
                     .reduce(|acc, s| format!("{acc},{s}"))
@@ -81,13 +84,13 @@ impl Renderer {
 
         buffer.push('>');
 
-        for child in node.children.iter() {
+        for child in RenderableElement::children(node).iter() {
             buffer.push_str(&self.render_node_to_string(child, cx));
         }
 
         buffer.push('<');
         buffer.push('/');
-        buffer.push_str(&node.tag);
+        buffer.push_str(RenderableElement::tag(node));
         buffer.push('>');
 
         buffer

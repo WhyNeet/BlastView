@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use blastview::{
-    session::{LiveSession, patch::Patch},
-    view::RenderableView,
-};
+use blastview::view::RenderableView;
 use dashmap::DashMap;
 use uuid::Uuid;
+use web::session::{LiveSession, patch::Patch};
 
 pub struct AppState<V: RenderableView + Send + Sync + 'static, F: Fn() -> V + Send + Sync + 'static>
 {

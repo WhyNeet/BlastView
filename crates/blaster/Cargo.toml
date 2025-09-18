@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 axum = { version = "0.8.4", features = ["ws"] }
 blastview = { path = "../blastview" }
+web = { path = "../web" }
 dashmap = "6.1.0"
 futures = "0.3.31"
 serde_json = "1.0.145"

@@ -137,6 +137,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "web",
 ]
 
 [[package]]
@@ -144,9 +145,6 @@ name = "blastview"
 version = "0.1.0"
 dependencies = [
  "dashmap",
- "flume",
- "html-escape",
- "serde",
  "tokio",
  "tracing",
  "uuid",
@@ -1259,6 +1257,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f143854a3b13752c6950862c906306adb27c7e839f7414cec8fea35beab624c1"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "web"
+version = "0.1.0"
+dependencies = [
+ "blastview",
+ "flume",
+ "html-escape",
+ "serde",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]

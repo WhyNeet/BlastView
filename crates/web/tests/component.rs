@@ -3,9 +3,9 @@ use std::sync::Arc;
 use blastview::{
     context::{Context, ViewContext},
     node::Node,
-    renderer::Renderer,
     view::{RenderableView, View},
 };
+use web::Renderer;
 
 #[test]
 fn view_rendering_works() {

@@ -3,28 +3,30 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
-pub(crate) mod events;
+pub mod events;
 mod public_api;
 pub(crate) mod registry;
 pub(crate) mod state;
 pub use public_api::*;
+pub mod context_registry;
 pub mod macros;
 
 use uuid::Uuid;
 
 use crate::{
     context::{
+        context_registry::ContextRegistry,
         events::{Event, EventRegistry},
         registry::OrderedViewRegistry,
         state::StateRegistry,
     },
     node::Node,
-    session::{RenderingQueue, context_registry::ContextRegistry},
+    rendering::RenderingQueue,
     view::{RenderableView, ViewRef},
 };
 
 pub struct Context {
-    pub(crate) id: Uuid,
+    pub id: Uuid,
 
     context_registry: Arc<ContextRegistry>,
     rendering_queue: Arc<RenderingQueue>,
@@ -108,7 +110,7 @@ impl Context {
         self.event_registry.clear();
     }
 
-    pub(crate) fn render(&self) -> Arc<Node> {
+    pub fn render(&self) -> Arc<Node> {
         if let Some(last_render) = &*self.last_render.lock().unwrap() {
             return Arc::clone(last_render);
         }
@@ -116,7 +118,7 @@ impl Context {
         self.force_render()
     }
 
-    pub(crate) fn force_render(&self) -> Arc<Node> {
+    pub fn force_render(&self) -> Arc<Node> {
         let mut last_render = self.last_render.lock().unwrap();
 
         self.prepare_render();
@@ -179,7 +181,7 @@ impl Context {
         }
     }
 
-    pub(crate) fn dispatch_event(&self, event: &Event) {
+    pub fn dispatch_event(&self, event: &Event) {
         if let Some(handler) = self.event_registry.get(event) {
             handler();
         }
@@ -187,7 +189,7 @@ impl Context {
         self.children.each(|cx| cx.dispatch_event(&event));
     }
 
-    pub(crate) fn get_child(&self, idx: usize) -> Option<Arc<Context>> {
+    pub fn get_child(&self, idx: usize) -> Option<Arc<Context>> {
         self.children.get(idx)
     }
 }

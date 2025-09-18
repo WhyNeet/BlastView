@@ -1,10 +1,12 @@
 [package]
-name = "blastview"
+name = "web"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-dashmap = "6.1.0"
-tracing = "0.1.41"
+blastview = { path = "../blastview" }
+html-escape = "0.2.13"
+flume = "0.11.1"
 uuid = { version = "1.18.1", features = ["v4"] }
 tokio = { version = "1.47.1", features = [] }
+serde = { version = "1.0.225", features = ["derive"] }
