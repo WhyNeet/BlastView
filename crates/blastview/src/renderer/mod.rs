@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::{
+    context::Context,
     node::{ElementNode, Node},
-    view::context::Context,
 };
 
 pub struct Renderer {

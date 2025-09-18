@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use crate::view::{RenderableView, ViewRef, context::Context};
+use crate::context::Context;
+use crate::view::{RenderableView, ViewRef};
 
 pub trait ViewContext {
     fn create_view<V, F>(&self, factory: F) -> ViewRef

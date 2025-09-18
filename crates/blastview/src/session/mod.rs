@@ -7,9 +7,10 @@ use tokio::sync::Notify;
 use uuid::Uuid;
 
 use crate::{
+    context::{Context, events::Event},
     renderer::Renderer,
     session::{context_registry::ContextRegistry, patch::Patch},
-    view::{View, context::Context, events::Event},
+    view::View,
 };
 
 #[derive(Default)]

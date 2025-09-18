@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::view::context::Context;
+use crate::context::Context;
 
 #[derive(Default)]
 pub struct OrderedViewRegistry {

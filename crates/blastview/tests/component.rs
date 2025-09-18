@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use blastview::{
+    context::{Context, ViewContext},
     node::Node,
     renderer::Renderer,
-    session::LiveSession,
-    view::{RenderableView, View, ViewContext, context::Context},
+    view::{RenderableView, View},
 };
 
 #[test]

@@ -56,10 +56,6 @@ impl StateRegistry {
         true
     }
 
-    pub fn is_dirty(&self) -> bool {
-        self.is_dirty.load(std::sync::atomic::Ordering::Relaxed)
-    }
-
     pub fn mark_clean(&self) {
         self.is_dirty
             .store(false, std::sync::atomic::Ordering::Relaxed);

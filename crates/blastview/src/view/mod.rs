@@ -1,11 +1,7 @@
-use crate::{node::Node, view::context::Context};
-
-pub mod context;
-pub(crate) mod events;
-mod public_api;
-pub(crate) mod registry;
-pub(crate) mod state;
-pub use public_api::*;
+use crate::{
+    context::{Context, ViewContext},
+    node::Node,
+};
 
 pub trait RenderableView {
     fn render(&self, cx: &Context) -> Node;

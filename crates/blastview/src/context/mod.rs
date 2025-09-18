@@ -3,17 +3,24 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
+pub(crate) mod events;
+mod public_api;
+pub(crate) mod registry;
+pub(crate) mod state;
+pub use public_api::*;
+pub mod macros;
+
 use uuid::Uuid;
 
 use crate::{
-    node::Node,
-    session::{RenderingQueue, context_registry::ContextRegistry},
-    view::{
-        RenderableView, ViewRef,
+    context::{
         events::{Event, EventRegistry},
         registry::OrderedViewRegistry,
         state::StateRegistry,
     },
+    node::Node,
+    session::{RenderingQueue, context_registry::ContextRegistry},
+    view::{RenderableView, ViewRef},
 };
 
 pub struct Context {

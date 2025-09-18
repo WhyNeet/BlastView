@@ -3,7 +3,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use uuid::Uuid;
 
-use crate::view::context::Context;
+use crate::context::Context;
 
 #[derive(Default)]
 pub struct ContextRegistry {
