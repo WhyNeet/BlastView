@@ -48,7 +48,9 @@ where
 
     let token = CancellationToken::new();
 
+    let recv_session = session.clone();
     let recv_task = tokio::spawn(async move {
+        let session = recv_session;
         while let Some(Ok(message)) = receiver.next().await {
             match message {
                 Message::Text(event) => {
@@ -82,4 +84,5 @@ where
 
     recv_task.await.unwrap();
     token.cancel();
+    session.stop_re_render_task();
 }

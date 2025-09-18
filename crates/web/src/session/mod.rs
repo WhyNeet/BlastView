@@ -8,6 +8,7 @@ use blastview::{
     view::View,
 };
 use tokio::sync::Notify;
+use tokio_util::sync::CancellationToken;
 
 use crate::{Renderer, session::patch::Patch};
 
@@ -18,6 +19,7 @@ pub struct LiveSession {
     context_registry: Arc<ContextRegistry>,
     re_render_notifier: Arc<Notify>,
     patch_sender: flume::Sender<Patch>,
+    stop_re_render_task: CancellationToken,
 }
 
 impl LiveSession {
@@ -45,6 +47,7 @@ impl LiveSession {
                 context_registry,
                 re_render_notifier: Default::default(),
                 patch_sender: patch_tx,
+                stop_re_render_task: CancellationToken::new(),
             },
             patch_rx,
         )
@@ -84,6 +87,10 @@ impl LiveSession {
         }
     }
 
+    pub fn stop_re_render_task(&self) {
+        self.stop_re_render_task.cancel();
+    }
+
     pub fn begin_re_render_task(self: Arc<Self>) {
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(16));
@@ -98,8 +105,18 @@ impl LiveSession {
                     _ = interval.tick() => {
                         self.process_re_render_queue().await;
                     }
+                    _ = self.stop_re_render_task.cancelled() => {
+                      break;
+                    }
                 }
             }
         });
+    }
+}
+
+impl Drop for LiveSession {
+    fn drop(&mut self) {
+        self.context_registry.clear();
+        self.rendering_queue.clear();
     }
 }
