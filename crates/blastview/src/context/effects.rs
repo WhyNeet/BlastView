@@ -7,19 +7,17 @@ use std::{
 };
 
 pub struct Effect {
-    f: Arc<dyn (Fn() -> Box<dyn FnOnce() + Send + Sync>) + Send + Sync>,
     hash: AtomicU64,
     cleanup: Mutex<Option<Box<dyn FnOnce() + Send + Sync>>>,
 }
 
 impl Effect {
     pub fn new<T: Hash>(
-        f: impl (Fn() -> Box<dyn FnOnce() + Send + Sync>) + Send + Sync + 'static,
+        f: impl (FnOnce() -> Box<dyn FnOnce() + Send + Sync>) + Send + Sync,
         deps: T,
     ) -> Self {
         Self {
             cleanup: Mutex::new(Some(f())),
-            f: Arc::new(f),
             hash: {
                 let mut hasher = DefaultHasher::new();
                 deps.hash(&mut hasher);
@@ -28,11 +26,11 @@ impl Effect {
         }
     }
 
-    pub fn run(&self) {
+    pub fn run(&self, f: impl (FnOnce() -> Box<dyn FnOnce() + Send + Sync>) + Send + Sync) {
         let mut cleanup = self.cleanup.lock().unwrap();
         cleanup.take().unwrap()();
 
-        *cleanup = Some(self.f.as_ref()());
+        *cleanup = Some(f());
     }
 }
 

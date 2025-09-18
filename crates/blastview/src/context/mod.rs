@@ -148,6 +148,16 @@ impl Context {
         &self,
         initial_value: T,
     ) -> (T, Arc<dyn Fn(T) + Send + Sync>) {
+        self.use_state_factory(|| initial_value)
+    }
+
+    pub(crate) fn use_state_factory<
+        T: Send + Sync + PartialEq + Clone + 'static,
+        F: FnOnce() -> T,
+    >(
+        &self,
+        factory: F,
+    ) -> (T, Arc<dyn Fn(T) + Send + Sync>) {
         let order = self
             .state_registration_order
             .fetch_add(1, Ordering::Relaxed);
@@ -165,6 +175,8 @@ impl Context {
             return (state.as_any().downcast_ref::<T>().unwrap().clone(), update);
         }
 
+        let initial_value = factory();
+
         self.state_registry.register(initial_value.clone());
 
         (initial_value, update)
@@ -172,7 +184,7 @@ impl Context {
 
     pub(crate) fn use_effect<F, T, C>(&self, f: F, deps: T)
     where
-        F: (Fn() -> C) + Send + Sync + 'static,
+        F: (FnOnce() -> C) + Send + Sync,
         T: Hash,
         C: FnOnce() + Send + Sync + 'static,
     {
@@ -182,13 +194,12 @@ impl Context {
 
         if let Some(effect) = self.effect_registry.get(order) {
             if self.effect_registry.update_deps(order, &deps) {
-                effect.run();
+                effect.run(move || Box::new(f()));
             }
             return;
         }
 
         let effect = Effect::new(move || Box::new(f()), deps);
-        effect.run();
         self.effect_registry.register(effect);
     }
 
@@ -216,9 +227,7 @@ impl Context {
     }
 
     pub fn dispatch_event(&self, event: &Event) {
-        if let Some(handler) = self.event_registry.get(event) {
-            handler();
-        }
+        self.event_registry.handle(event);
 
         self.children.each(|cx| cx.dispatch_event(&event));
     }

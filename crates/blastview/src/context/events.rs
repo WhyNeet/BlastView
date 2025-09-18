@@ -15,12 +15,14 @@ pub struct Event {
 }
 
 impl EventRegistry {
-    pub fn register(&self, event: Event, cx: Arc<dyn Fn() + Send + Sync>) {
-        self.mapping.insert(event, cx);
+    pub fn register(&self, event: Event, handler: Arc<dyn Fn() + Send + Sync>) {
+        self.mapping.insert(event, handler);
     }
 
-    pub fn get(&self, event: &Event) -> Option<Arc<dyn Fn() + Send + Sync>> {
-        self.mapping.get(event).map(|cx| Arc::clone(&cx))
+    pub fn handle(&self, event: &Event) {
+        if let Some(handler) = self.mapping.get(event) {
+            handler();
+        }
     }
 
     pub fn unregister(&self, event: &Event) {

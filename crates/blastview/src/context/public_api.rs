@@ -15,9 +15,14 @@ pub trait ViewContext {
         initial_value: T,
     ) -> (T, Arc<dyn Fn(T) + Send + Sync>);
 
+    fn use_state_factory<T: Send + Sync + PartialEq + Clone + 'static, F: FnOnce() -> T>(
+        &self,
+        factory: F,
+    ) -> (T, Arc<dyn Fn(T) + Send + Sync>);
+
     fn use_effect<F, T, C>(&self, f: F, deps: T)
     where
-        F: (Fn() -> C) + Send + Sync + 'static,
+        F: (FnOnce() -> C) + Send + Sync,
         T: Hash,
         C: FnOnce() + Send + Sync + 'static;
 }
@@ -40,10 +45,17 @@ impl ViewContext for Context {
 
     fn use_effect<F, T, C>(&self, f: F, deps: T)
     where
-        F: (Fn() -> C) + Send + Sync + 'static,
+        F: (FnOnce() -> C) + Send + Sync,
         T: Hash,
         C: FnOnce() + Send + Sync + 'static,
     {
         self.use_effect(f, deps);
+    }
+
+    fn use_state_factory<T: Send + Sync + PartialEq + Clone + 'static, F: FnOnce() -> T>(
+        &self,
+        factory: F,
+    ) -> (T, Arc<dyn Fn(T) + Send + Sync>) {
+        self.use_state_factory(factory)
     }
 }
