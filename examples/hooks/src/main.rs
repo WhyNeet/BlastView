@@ -26,7 +26,7 @@ struct MyView;
 impl View for MyView {
     fn render(&self, cx: &impl ViewContext) -> impl Into<Node> {
         let (count, set_count) = use_state!(cx, 38);
-        let expensive_computation = use_async_memo!(
+        let (is_loading, fib) = use_async_memo!(
             cx,
             async || {
                 // this function may take a lot of time to run
@@ -50,7 +50,11 @@ impl View for MyView {
             )
             .child(Node::new("p").child(format!(
                 "fib({count}): {}",
-                expensive_computation.unwrap_or(0)
+                if is_loading {
+                    "computing..."
+                } else {
+                    &fib.unwrap().to_string()
+                }
             )))
     }
 }
