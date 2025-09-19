@@ -89,7 +89,7 @@ impl View for AutoIncrementCounterView {
                 }
             });
 
-            Some(Box::new(move || task.abort()))
+            move || task.abort()
         });
 
         Node::new("div").child(format!("Count is: {}", count.to_string()))

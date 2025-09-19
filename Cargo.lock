@@ -426,6 +426,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "hooks"
+version = "0.1.0"
+dependencies = [
+ "blaster",
+ "blastview",
+ "tokio",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "html-escape"
 version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
