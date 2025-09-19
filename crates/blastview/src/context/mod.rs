@@ -6,6 +6,7 @@ use std::{
     },
 };
 
+pub(crate) mod diffing;
 pub(crate) mod effects;
 pub mod events;
 mod public_api;
@@ -20,15 +21,17 @@ use uuid::Uuid;
 use crate::{
     context::{
         context_registry::ContextRegistry,
+        diffing::diff,
         effects::{Effect, EffectRegistry},
         events::{Event, EventRegistry},
         registry::OrderedViewRegistry,
         state::StateRegistry,
     },
-    node::Node,
+    node::{ElementNode, Node},
     rendering::RenderingQueue,
     view::{RenderableView, ViewRef},
 };
+pub use diffing::NodePatch;
 
 pub struct Context {
     pub id: Uuid,
@@ -47,7 +50,8 @@ pub struct Context {
     effect_registry: EffectRegistry,
     effect_registration_order: AtomicUsize,
 
-    last_render: Mutex<Option<Arc<Node>>>,
+    last_render: Mutex<Option<Node>>,
+    diff: Mutex<Option<Vec<NodePatch>>>,
     view: Arc<dyn RenderableView + Send + Sync>,
 }
 
@@ -77,6 +81,7 @@ impl Context {
             effect_registration_order: AtomicUsize::default(),
 
             last_render: Default::default(),
+            diff: Default::default(),
             view,
         });
 
@@ -122,15 +127,15 @@ impl Context {
         self.event_registry.clear();
     }
 
-    pub fn render(&self) -> Arc<Node> {
-        if let Some(last_render) = &*self.last_render.lock().unwrap() {
-            return Arc::clone(last_render);
+    pub fn render(&self) -> Vec<NodePatch> {
+        if self.last_render.lock().unwrap().is_some() {
+            return vec![];
         }
 
         self.force_render()
     }
 
-    pub fn force_render(&self) -> Arc<Node> {
+    pub fn force_render(&self) -> Vec<NodePatch> {
         let mut last_render = self.last_render.lock().unwrap();
 
         self.prepare_render();
@@ -139,9 +144,18 @@ impl Context {
 
         let tree = self.view.render(self);
         self.register_events(&tree);
-        let tree = Arc::new(tree);
-        *last_render = Some(Arc::clone(&tree));
-        tree
+        let patches = if let Some(last_render) = last_render.take() {
+            let diff = diff(last_render, tree.clone(), self.id, 0);
+            *self.diff.lock().unwrap() = Some(diff.clone());
+            diff
+        } else {
+            vec![NodePatch::ReplaceViewChildren {
+                view_id: self.id,
+                children: vec![tree.clone()],
+            }]
+        };
+        *last_render = Some(tree);
+        patches
     }
 
     pub(crate) fn use_state<T: Send + Sync + PartialEq + Clone + 'static>(
@@ -234,6 +248,14 @@ impl Context {
 
     pub fn get_child(&self, idx: usize) -> Option<Arc<Context>> {
         self.children.get(idx)
+    }
+
+    pub fn view_node(&self) -> ElementNode {
+        Node::new("bv-view").attr("data-view", &self.id.to_string())
+    }
+
+    pub fn with_last_render<R>(&self, f: impl FnOnce(Option<&Node>) -> R) -> R {
+        f(self.last_render.lock().unwrap().as_ref())
     }
 }
 

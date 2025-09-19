@@ -1,8 +1,13 @@
 use uuid::Uuid;
 
 use crate::view::ViewRef;
-use std::{collections::HashMap, fmt::Display, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+    sync::Arc,
+};
 
+#[derive(Debug, Clone)]
 pub enum Node {
     Text(Box<TextNode>),
     Element(Box<ElementNode>),
@@ -19,14 +24,31 @@ impl Node {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct TextNode(pub(crate) String);
 
+#[derive(Clone)]
 pub struct ElementNode {
     pub(crate) id: Uuid,
     pub(crate) tag: String,
     pub(crate) attrs: HashMap<String, String>,
     pub(crate) events: HashMap<String, Arc<dyn Fn() + Send + Sync>>,
     pub(crate) children: Vec<Node>,
+}
+
+impl Debug for ElementNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ElementNode")
+            .field("id", &self.id)
+            .field("tag", &self.tag)
+            .field("attrs", &self.attrs)
+            .field(
+                "events",
+                &self.events.iter().map(|(name, _)| name).collect::<Vec<_>>(),
+            )
+            .field("children", &self.children)
+            .finish()
+    }
 }
 
 impl ElementNode {
