@@ -46,7 +46,9 @@ macro_rules! use_async_memo {
       $cx.use_effect(|| {
         let set_state = set_state.clone();
         let task = tokio::spawn(async move {
-          set_state(Some($callback().await));
+          let result = $callback().await;
+          tokio::task::yield_now().await;
+          set_state(Some(result));
         });
         move || task.abort()
       }, 0);
@@ -61,7 +63,9 @@ macro_rules! use_async_memo {
       $cx.use_effect(|| {
         let set_state = set_state.clone();
         let task = tokio::spawn(async move {
-          set_state(Some($callback().await));
+          let result = $callback().await;
+          tokio::task::yield_now().await;
+          set_state(Some(result));
         });
         move || task.abort()
       }, &[$( $dep ),+]);
