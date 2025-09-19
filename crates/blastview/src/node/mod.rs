@@ -1,7 +1,7 @@
 use uuid::Uuid;
 
 use crate::view::ViewRef;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 pub enum Node {
     Text(Box<TextNode>),
@@ -59,27 +59,15 @@ impl ElementNode {
     }
 }
 
-impl Into<TextNode> for &str {
-    fn into(self) -> TextNode {
-        TextNode(self.to_string())
+impl<T: Display> From<T> for TextNode {
+    fn from(value: T) -> Self {
+        Self(value.to_string())
     }
 }
 
-impl Into<TextNode> for String {
-    fn into(self) -> TextNode {
-        TextNode(self)
-    }
-}
-
-impl Into<Node> for &str {
-    fn into(self) -> Node {
-        TextNode(self.to_string()).into()
-    }
-}
-
-impl Into<Node> for String {
-    fn into(self) -> Node {
-        TextNode(self).into()
+impl<T: Display> From<T> for Node {
+    fn from(value: T) -> Self {
+        Self::Text(Box::new(TextNode(value.to_string())))
     }
 }
 
