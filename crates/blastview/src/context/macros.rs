@@ -42,35 +42,39 @@ macro_rules! use_async_memo {
   ($cx:expr, $callback:expr $(,)?) => {
     {
       let (state, set_state) = $cx.use_state_factory(None);
+      let (is_loading, set_is_loading) = $cx.use_state(false);
 
       $cx.use_effect(|| {
-        let set_state = set_state.clone();
         let task = tokio::spawn(async move {
+          set_is_loading(true);
           let result = $callback().await;
           tokio::task::yield_now().await;
           set_state(Some(result));
+          set_is_loading(false);
         });
         move || task.abort()
       }, 0);
 
-      state
+      (is_loading, state)
     }
   };
   ($cx:expr, $callback:expr, $( $dep:expr ),+ $(,)?) => {
     {
       let (state, set_state) = $cx.use_state(None);
+      let (is_loading, set_is_loading) = $cx.use_state(true);
 
       $cx.use_effect(|| {
-        let set_state = set_state.clone();
         let task = tokio::spawn(async move {
+          set_is_loading(true);
           let result = $callback().await;
           tokio::task::yield_now().await;
           set_state(Some(result));
+          set_is_loading(false);
         });
         move || task.abort()
       }, &[$( $dep ),+]);
 
-      state
+      (is_loading, state)
     }
   };
 }
