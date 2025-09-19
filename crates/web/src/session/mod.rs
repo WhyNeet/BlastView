@@ -96,17 +96,11 @@ impl LiveSession {
                 .unwrap();
         };
 
-        for view_id in self.rendering_queue.render_queue.lock().unwrap().drain(..) {
+        for view_id in self.rendering_queue.render_queue.lock().unwrap().drain() {
             process_view(view_id);
         }
 
-        for view_id in self
-            .rendering_queue
-            .deferred_queue
-            .lock()
-            .unwrap()
-            .drain(..)
-        {
+        for view_id in self.rendering_queue.deferred_queue.lock().unwrap().drain() {
             process_view(view_id);
         }
     }

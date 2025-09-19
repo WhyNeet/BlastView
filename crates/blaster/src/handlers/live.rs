@@ -55,6 +55,7 @@ where
             match message {
                 Message::Text(event) => {
                     let event = event.as_str().to_string();
+                    let session = session.clone();
                     session.dispatch_event(event);
                 }
                 Message::Close(_) => {
