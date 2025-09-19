@@ -20,10 +20,6 @@ pub enum Patch {
         selector: String,
         name: String,
     },
-    SetText {
-        selector: String,
-        text: String,
-    },
     AppendChild {
         selector: String,
         html: String,
@@ -32,8 +28,21 @@ pub enum Patch {
         selector: String,
         html: String,
     },
+    ReplaceChild {
+        selector: String,
+        index: usize,
+        html: String,
+    },
     RemoveElement {
         selector: String,
+    },
+    AttachEvent {
+        selector: String,
+        event: String,
+    },
+    DetachEvent {
+        selector: String,
+        event: String,
     },
     Batch {
         patches: Vec<Patch>,

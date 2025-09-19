@@ -3,7 +3,7 @@ pub mod patch;
 use std::sync::Arc;
 
 use blastview::{
-    context::{Context, context_registry::ContextRegistry, events::Event},
+    context::{Context, NodePatch, context_registry::ContextRegistry, events::Event},
     rendering::RenderingQueue,
     view::View,
 };
@@ -83,17 +83,65 @@ impl LiveSession {
                 return;
             }
             let cx = self.context_registry.get(&view_id).unwrap();
-            let tree = cx.force_render();
-            let view_string = self.renderer.render_node_to_string(&tree, &cx);
+            let patches = cx.force_render();
+            let patches = patches
+                .into_iter()
+                .map(|patch| match patch {
+                    NodePatch::ReplaceViewChildren { view_id, children } => Patch::ReplaceInner {
+                        selector: format!(r#"bv-view[data-view="{view_id}"]"#),
+                        html: children
+                            .into_iter()
+                            .map(|child| self.renderer.render_node_to_string(&child, &cx))
+                            .collect(),
+                    },
+                    NodePatch::ReplaceChildren { node_id, children } => Patch::ReplaceInner {
+                        selector: format!(r#"[data-id="{node_id}"]"#),
+                        html: children
+                            .into_iter()
+                            .map(|child| self.renderer.render_node_to_string(&child, &cx))
+                            .collect(),
+                    },
+                    NodePatch::ReplaceChild {
+                        node_id,
+                        child_idx,
+                        node,
+                    } => Patch::ReplaceChild {
+                        selector: format!(r#"[data-id="{node_id}"]"#),
+                        index: child_idx,
+                        html: self.renderer.render_node_to_string(&node, &cx),
+                    },
+                    NodePatch::Replace { node_id, node } => Patch::ReplaceOuter {
+                        selector: format!(r#"[data-id="{node_id}"]"#),
+                        html: self.renderer.render_node_to_string(&node, &cx),
+                    },
+                    NodePatch::SetAttr {
+                        node_id,
+                        attr,
+                        value,
+                    } => Patch::SetAttribute {
+                        selector: format!(r#"[data-id="{node_id}"]"#),
+                        name: attr,
+                        value,
+                    },
+                    NodePatch::RemoveAttr { node_id, attr } => Patch::RemoveAttribute {
+                        selector: format!(r#"[data-id="{node_id}"]"#),
+                        name: attr,
+                    },
+                    NodePatch::AttachEvent { node_id, event } => Patch::AttachEvent {
+                        selector: format!(r#"[data-id="{node_id}"]"#),
+                        event,
+                    },
+                    NodePatch::DetachEvent { node_id, event } => Patch::DetachEvent {
+                        selector: format!(r#"[data-id="{node_id}"]"#),
+                        event,
+                    },
+                })
+                .collect();
+
             if self.patch_sender.is_disconnected() {
                 return;
             }
-            self.patch_sender
-                .send(Patch::ReplaceInner {
-                    selector: format!(r#"bv-view[data-view="{}"]"#, cx.id),
-                    html: view_string,
-                })
-                .unwrap();
+            self.patch_sender.send(Patch::Batch { patches }).unwrap();
         };
 
         for view_id in self.rendering_queue.render_queue.lock().unwrap().drain() {

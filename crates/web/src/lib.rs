@@ -23,13 +23,11 @@ impl Renderer {
     }
 
     fn render_view_to_string(&self, cx: &Context) -> String {
-        let node = cx.render();
+        cx.render();
 
-        format!(
-            r#"<bv-view data-view="{}">{}</bv-view>"#,
-            cx.id,
-            self.render_node_to_string(&node, &cx)
-        )
+        let node = cx.with_last_render(|node| cx.view_node().child(node.unwrap().clone()).into());
+
+        self.render_node_to_string(&node, &cx)
     }
 
     pub fn render_node_to_string(&self, node: &Node, cx: &Context) -> String {
@@ -60,14 +58,13 @@ impl Renderer {
             buffer.push('"');
         }
 
+        buffer.push(' ');
+        buffer.push_str("data-id");
+        buffer.push('=');
+        buffer.push('"');
+        buffer.push_str(&RenderableElement::id(node).to_string());
+        buffer.push('"');
         if !RenderableElement::events(node).is_empty() {
-            buffer.push(' ');
-            buffer.push_str("data-id");
-            buffer.push('=');
-            buffer.push('"');
-            buffer.push_str(&RenderableElement::id(node).to_string());
-            buffer.push('"');
-
             buffer.push(' ');
             buffer.push_str("data-events");
             buffer.push('=');
