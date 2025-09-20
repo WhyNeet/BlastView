@@ -50,7 +50,6 @@ function applyPatch(patch) {
       {
         const elements = document.querySelectorAll(patch["selector"]);
         elements.forEach((element) => {
-          console.log(element);
           const oldChild = element.childNodes[patch["index"]];
           cleanupEventListeners(oldChild);
           const div = document.createElement("div");

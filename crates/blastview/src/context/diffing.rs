@@ -40,14 +40,15 @@ pub enum NodePatch {
     },
 }
 
-pub fn diff(from_node: Node, to_node: Node, parent_id: Uuid, idx: usize) -> Vec<NodePatch> {
+pub fn diff(from_node: Node, to_node: &mut Node, parent_id: Uuid, idx: usize) -> Vec<NodePatch> {
     match from_node {
         Node::Element(from) => match to_node {
-            Node::Element(ref to) => {
+            Node::Element(to) => {
+                to.id = from.id;
                 if from.tag != to.tag {
                     return vec![NodePatch::Replace {
                         node_id: from.id,
-                        node: to_node,
+                        node: to_node.clone(),
                     }];
                 }
 
@@ -100,39 +101,39 @@ pub fn diff(from_node: Node, to_node: Node, parent_id: Uuid, idx: usize) -> Vec<
 
                 let parent_id = from.id;
 
-                (*from)
+                let patches = (*from)
                     .children
                     .into_iter()
                     .zip(
                         (match to_node {
-                            Node::Element(node) => node.children,
+                            Node::Element(node) => node,
                             _ => unreachable!(),
                         })
-                        .into_iter(),
+                        .children
+                        .iter_mut(),
                     )
-                    .for_each(|(from, to)| {
-                        patches.append(&mut diff(from, to, parent_id, idx));
-                    });
+                    .flat_map(|(from, to)| diff(from, to, parent_id, idx))
+                    .collect();
 
                 patches
             }
-            other => vec![NodePatch::Replace {
+            _ => vec![NodePatch::Replace {
                 node_id: from.id,
-                node: other,
+                node: to_node.clone(),
             }],
         },
         Node::Text(from) => match to_node {
             Node::Element(_) => vec![NodePatch::ReplaceChild {
                 node_id: parent_id,
                 child_idx: idx,
-                node: to_node,
+                node: to_node.clone(),
             }],
-            Node::Text(ref to) => {
+            Node::Text(to) => {
                 if from.0 != to.0 {
                     vec![NodePatch::ReplaceChild {
                         node_id: parent_id,
                         child_idx: idx,
-                        node: to_node,
+                        node: to_node.clone(),
                     }]
                 } else {
                     vec![]

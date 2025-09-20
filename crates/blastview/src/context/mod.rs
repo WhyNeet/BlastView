@@ -2,7 +2,7 @@ use std::{
     hash::Hash,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
 };
 
@@ -50,6 +50,7 @@ pub struct Context {
     effect_registry: EffectRegistry,
     effect_registration_order: AtomicUsize,
 
+    has_rendered: AtomicBool,
     last_render: Mutex<Option<Node>>,
     diff: Mutex<Option<Vec<NodePatch>>>,
     view: Arc<dyn RenderableView + Send + Sync>,
@@ -80,6 +81,7 @@ impl Context {
             effect_registry: EffectRegistry::default(),
             effect_registration_order: AtomicUsize::default(),
 
+            has_rendered: AtomicBool::new(false),
             last_render: Default::default(),
             diff: Default::default(),
             view,
@@ -142,10 +144,9 @@ impl Context {
         // for now, atomic node event operations are not possible - diffing is not yet implemented
         self.unregister_events();
 
-        let tree = self.view.render(self);
-        self.register_events(&tree);
-        let patches = if let Some(last_render) = last_render.take() {
-            let diff = diff(last_render, tree.clone(), self.id, 0);
+        let mut tree = self.view.render(self);
+        let patches = if self.has_rendered.swap(true, Ordering::Relaxed) {
+            let diff = diff(last_render.take().unwrap(), &mut tree, self.id, 0);
             *self.diff.lock().unwrap() = Some(diff.clone());
             diff
         } else {
@@ -154,7 +155,9 @@ impl Context {
                 children: vec![tree.clone()],
             }]
         };
+        self.register_events(&tree);
         *last_render = Some(tree);
+
         patches
     }
 
