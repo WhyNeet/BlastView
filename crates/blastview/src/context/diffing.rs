@@ -2,7 +2,7 @@ use uuid::Uuid;
 
 use crate::node::Node;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum NodePatch {
     ReplaceChildren {
         node_id: Uuid,
@@ -112,7 +112,8 @@ pub fn diff(from_node: Node, to_node: &mut Node, parent_id: Uuid, idx: usize) ->
                         .children
                         .iter_mut(),
                     )
-                    .flat_map(|(from, to)| diff(from, to, parent_id, idx))
+                    .enumerate()
+                    .flat_map(|(idx, (from, to))| diff(from, to, parent_id, idx))
                     .collect();
 
                 patches

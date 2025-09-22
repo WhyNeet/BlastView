@@ -29,6 +29,14 @@ impl EventRegistry {
         self.mapping.remove(event);
     }
 
+    pub fn unregister_for_node(&self, node_id: &Uuid) {
+        for pair in self.mapping.iter() {
+            if pair.key().node_id == *node_id {
+                self.mapping.remove(pair.key());
+            }
+        }
+    }
+
     pub fn clear(&self) {
         self.mapping.clear();
     }

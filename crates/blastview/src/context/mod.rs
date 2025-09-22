@@ -125,10 +125,6 @@ impl Context {
         self.state_registry.mark_clean();
     }
 
-    fn unregister_events(&self) {
-        self.event_registry.clear();
-    }
-
     pub fn render(&self) -> Vec<NodePatch> {
         if self.last_render.lock().unwrap().is_some() {
             return vec![];
@@ -142,7 +138,7 @@ impl Context {
 
         self.prepare_render();
         // for now, atomic node event operations are not possible - diffing is not yet implemented
-        self.unregister_events();
+        self.event_registry.clear();
 
         let mut tree = self.view.render(self);
         let patches = if self.has_rendered.swap(true, Ordering::Relaxed) {
@@ -150,6 +146,7 @@ impl Context {
             *self.diff.lock().unwrap() = Some(diff.clone());
             diff
         } else {
+            self.register_events(&tree);
             vec![NodePatch::ReplaceViewChildren {
                 view_id: self.id,
                 children: vec![tree.clone()],
@@ -157,7 +154,6 @@ impl Context {
         };
         self.register_events(&tree);
         *last_render = Some(tree);
-
         patches
     }
 
